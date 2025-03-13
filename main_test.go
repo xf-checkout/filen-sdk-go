@@ -131,13 +131,11 @@ func TestUploadsToGoDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	smallRandomBytes := make([]byte, 1024)
-	_, _ = rand.Read(smallRandomBytes)
 	testSmallFile, err := types.NewIncompleteFile(filen.AuthVersion, "small.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = filen.UploadFile(context.Background(), testSmallFile, bytes.NewReader([]byte(hex.EncodeToString(smallRandomBytes))))
+	_, err = filen.UploadFile(context.Background(), testSmallFile, bytes.NewReader([]byte("Hello World from Go!")))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,8 +190,8 @@ func TestDownloadsFromTSDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(smallBytes) != 1024*2 {
-		t.Fatal("expected small file to be 2048 bytes long")
+	if string(smallBytes) != "Hello World from TypeScript!" {
+		t.Fatalf("small file did not match expected contents: %s", string(smallBytes))
 	}
 
 	big, err := filen.FindFile(context.Background(), "compat-ts/big.txt")
