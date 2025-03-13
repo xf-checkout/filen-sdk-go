@@ -34,7 +34,6 @@ func (api *Filen) serialize() *SerializableFilen {
 		Email:          api.Email,
 		MasterKeys:     masterKeys,
 		DEK:            api.DEK.Bytes,
-		KEK:            api.KEK.Bytes,
 		PrivateKey:     x509.MarshalPKCS1PrivateKey(&api.PrivateKey),
 		HMACKey:        api.HMACKey,
 		BaseFolderUUID: api.BaseFolder.GetUUID(),
@@ -52,7 +51,6 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 	}
 	var (
 		dek crypto.EncryptionKey
-		kek crypto.EncryptionKey
 	)
 	if s.AuthVersion >= 3 {
 		dekPtr, err := crypto.MakeEncryptionKeyFromBytes(s.DEK)
@@ -60,12 +58,6 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 			return nil, fmt.Errorf("failed to parse DEK: %w", err)
 		}
 		dek = *dekPtr
-
-		kekPtr, err := crypto.MakeEncryptionKeyFromBytes(s.KEK)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse KEK: %w", err)
-		}
-		kek = *kekPtr
 	}
 	privateKey, err := x509.ParsePKCS1PrivateKey(s.PrivateKey)
 	if err != nil {
@@ -78,7 +70,6 @@ func (s *SerializableFilen) deserialize() (*Filen, error) {
 		Email:       s.Email,
 		MasterKeys:  masterKeys,
 		DEK:         dek,
-		KEK:         kek,
 		PrivateKey:  *privateKey,
 		PublicKey:   privateKey.PublicKey,
 		HMACKey:     s.HMACKey,

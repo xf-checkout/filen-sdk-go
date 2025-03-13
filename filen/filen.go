@@ -22,7 +22,6 @@ type Filen struct {
 	// until one works; for encryption, always use the latest master key.
 	MasterKeys crypto.MasterKeys
 	DEK        crypto.EncryptionKey
-	KEK        crypto.EncryptionKey
 
 	PrivateKey rsa.PrivateKey
 	PublicKey  rsa.PublicKey
@@ -222,13 +221,12 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		Client:      c,
 		Email:       email,
 		MasterKeys:  make(crypto.MasterKeys, 0),
-		KEK:         kek,
 		DEK:         *dek,
 		PrivateKey:  *privateKey,
 		PublicKey:   *publicKey,
 		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
 		AuthVersion: info.AuthVersion,
-		HMACKey:        crypto.MakeHMACKey(privateKey),
+		HMACKey:     crypto.MakeHMACKey(privateKey),
 	}, nil
 }
 
