@@ -91,3 +91,65 @@ func DeserializeFrom(r io.Reader) (*Filen, error) {
 	}
 	return s.deserialize()
 }
+
+type TSConfig struct {
+	Email          string
+	MasterKeys     []string
+	APIKey         string
+	PublicKey      string
+	PrivateKey     string
+	AuthVersion    int
+	BaseFolderUUID string
+}
+
+func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
+	switch tsconfig.AuthVersion {
+	case 2:
+		masterKeys := make([]crypto.MasterKey, len(tsconfig.MasterKeys))
+		for i, masterKey := range tsconfig.MasterKeys {
+			if len(masterKey) != 64 {
+				return nil, fmt.Errorf("invalid master key length: %d", len(masterKey))
+			}
+			masterKey, err := crypto.NewMasterKey([64]byte([]byte(masterKey)))
+			if err != nil {
+				panic(err)
+			}
+			masterKeys[i] = *masterKey
+		}
+		privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(tsconfig.PrivateKey, tsconfig.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
+		}
+		return &Filen{
+			Client:      client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
+			AuthVersion: tsconfig.AuthVersion,
+			Email:       tsconfig.Email,
+			MasterKeys:  masterKeys,
+			PrivateKey:  *privateKey,
+			PublicKey:   *publicKey,
+			BaseFolder:  types.NewRootDirectory(tsconfig.BaseFolderUUID),
+		}, nil
+	case 3:
+		dek, err := crypto.MakeEncryptionKeyFromStr(tsconfig.MasterKeys[0])
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DEK: %w", err)
+		}
+		private, public, err := crypto.RSAKeyPairFromStrings(tsconfig.PrivateKey, tsconfig.PublicKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
+		}
+		return &Filen{
+			Client:      client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
+			AuthVersion: tsconfig.AuthVersion,
+			Email:       tsconfig.Email,
+			MasterKeys:  make(crypto.MasterKeys, 0),
+			DEK:         *dek,
+			PrivateKey:  *private,
+			PublicKey:   *public,
+			HMACKey:     crypto.MakeHMACKey(private),
+			BaseFolder:  types.NewRootDirectory(tsconfig.BaseFolderUUID),
+		}, nil
+	default:
+		return nil, fmt.Errorf("invalid auth version: %d", tsconfig.AuthVersion)
+	}
+}

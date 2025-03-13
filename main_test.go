@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
@@ -306,19 +308,11 @@ func TestReadDirectories(t *testing.T) {
 }
 
 func TestSerialization(t *testing.T) {
-	//osFile, err := os.Create("cache/login.filen")
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
 	buffer := bytes.NewBuffer(make([]byte, 0, 1024*1024))
 	err := filen.SerializeTo(buffer)
 	if err != nil {
 		t.Fatal(err)
 	}
-	//_, err = osFile.Seek(0, io.SeekStart)
-	//if err != nil {
-	//	t.Fatal(err)
-	//}
 	deserialized, err := sdk.DeserializeFrom(buffer)
 	if err != nil {
 		t.Fatal(err)
@@ -331,6 +325,55 @@ func TestSerialization(t *testing.T) {
 	if filen.Client.APIKey != deserializedClient.APIKey {
 		t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, deserializedClient.APIKey)
 	}
+	t.Run("TSConfig", func(t *testing.T) {
+		masterKeys := make([]string, max(len(filen.MasterKeys), 1))
+		switch filen.AuthVersion {
+		case 2:
+			for i, masterKey := range filen.MasterKeys {
+				masterKeys[i] = string(masterKey.Bytes[:])
+			}
+		case 3:
+			masterKeys[0] = hex.EncodeToString(filen.DEK.Bytes[:])
+		default:
+			panic("Unknown auth version")
+		}
+
+		privateKeyRaw, err := x509.MarshalPKCS8PrivateKey(&filen.PrivateKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		privateKeyEncoded := base64.StdEncoding.EncodeToString(privateKeyRaw)
+
+		publicKeyRaw, err := x509.MarshalPKIXPublicKey(&filen.PublicKey)
+		if err != nil {
+			t.Fatal(err)
+		}
+		publicKeyEncoded := base64.StdEncoding.EncodeToString(publicKeyRaw)
+
+		tsConfig := &sdk.TSConfig{
+			Email:          filen.Email,
+			MasterKeys:     masterKeys,
+			APIKey:         filen.Client.APIKey,
+			PrivateKey:     privateKeyEncoded,
+			PublicKey:      publicKeyEncoded,
+			AuthVersion:    filen.AuthVersion,
+			BaseFolderUUID: filen.BaseFolder.GetUUID(),
+		}
+
+		tsDeserialized, err := sdk.NewFromTSConfig(*tsConfig)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		deserializedClient = tsDeserialized.Client
+		tsDeserialized.Client = filen.Client
+		if !reflect.DeepEqual(filen, tsDeserialized) {
+			t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, tsDeserialized)
+		}
+		if filen.Client.APIKey != deserializedClient.APIKey {
+			t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, deserializedClient.APIKey)
+		}
+	})
 }
 
 func TestDirectoryActions(t *testing.T) {
