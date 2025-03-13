@@ -203,6 +203,9 @@ func (api *Filen) TrashFile(ctx context.Context, file types.File) error {
 
 // CreateDirectory creates a new directory.
 func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInterface, name string) (*types.Directory, error) {
+	if strings.ContainsRune(name, '/') {
+		return nil, fmt.Errorf("invalid directory name")
+	}
 	directoryUUID := uuid.New().String()
 	creationTime := time.Now().Round(time.Millisecond)
 	// encrypt metadata

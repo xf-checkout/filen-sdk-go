@@ -23,6 +23,9 @@ type IncompleteFile struct {
 }
 
 func NewIncompleteFile(authVersion int, name string, mimeType string, created time.Time, lastModified time.Time, parent DirectoryInterface) (*IncompleteFile, error) {
+	if strings.ContainsRune(name, '/') {
+		return nil, fmt.Errorf("invalid file name")
+	}
 	key, err := crypto.MakeNewFileKey(authVersion)
 	if err != nil {
 		return nil, fmt.Errorf("make new file key: %w", err)
