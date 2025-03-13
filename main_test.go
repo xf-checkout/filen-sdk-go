@@ -91,10 +91,22 @@ func TestMain(m *testing.M) {
 // this is so the TS sdk can validate these files on its side and check if they are compatible
 // there should ideally be a TestDownloadsFromTSDir that validates files from the TS sdk
 func TestUploadsToGoDir(t *testing.T) {
-	goDir, err := filen.FindDirectoryOrCreate(context.Background(), "compat-go")
+	goDir, err := filen.FindDirectory(context.Background(), "compat-go")
 	if err != nil {
 		t.Fatal(err)
 	}
+	if goDir != nil {
+		err = filen.TrashDirectory(context.Background(), goDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	goDir, err = filen.CreateDirectory(context.Background(), filen.BaseFolder, "compat-go")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	testDir, err := filen.FindDirectory(context.Background(), "compat-go/dir")
 	if err != nil {
 		t.Fatal(err)
@@ -105,28 +117,31 @@ func TestUploadsToGoDir(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	_, err = filen.CreateDirectory(context.Background(), goDir, "compat-go/dir")
+	_, err = filen.CreateDirectory(context.Background(), goDir, "dir")
 	if err != nil {
 		t.Fatal(err)
 	}
+
 	testEmptyFile, err := types.NewIncompleteFile(filen.AuthVersion, "empty.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
+	_, err = filen.UploadFile(context.Background(), testEmptyFile, bytes.NewReader(make([]byte, 0)))
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	smallRandomBytes := make([]byte, 1024)
 	_, _ = rand.Read(smallRandomBytes)
-	_, err = filen.UploadFile(context.Background(), testEmptyFile, bytes.NewReader([]byte(hex.EncodeToString(smallRandomBytes))))
+	testSmallFile, err := types.NewIncompleteFile(filen.AuthVersion, "small.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	testFile, err := types.NewIncompleteFile(filen.AuthVersion, "small.txt", "", time.Now(), time.Now(), goDir)
+	_, err = filen.UploadFile(context.Background(), testSmallFile, bytes.NewReader([]byte(hex.EncodeToString(smallRandomBytes))))
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, err = filen.UploadFile(context.Background(), testFile, bytes.NewReader([]byte("Hello World From Go!")))
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	bigRandomBytes := make([]byte, 1024*1024*4)
 	_, _ = rand.Read(bigRandomBytes)
 	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "big.txt", "", time.Now(), time.Now(), goDir)
