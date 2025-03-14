@@ -132,7 +132,7 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
-		var metadata FileMetadata
+		var metadata types.FileMetadata
 		err = json.Unmarshal([]byte(metadataStr), &metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling metadata: %v", err)

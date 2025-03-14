@@ -23,16 +23,6 @@ type FileUpload struct {
 	hasher    hash.Hash
 }
 
-type FileMetadata struct {
-	Name         string `json:"name"`
-	Size         int    `json:"size"`
-	MimeType     string `json:"mime"`
-	Key          string `json:"key"`
-	LastModified int    `json:"lastModified"`
-	Created      int    `json:"creation"`
-	Hash         string `json:"hash"`
-}
-
 func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *FileUpload {
 	return &FileUpload{
 		IncompleteFile: *file,
@@ -66,15 +56,9 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *FileUpload) *client.V3U
 }
 
 func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
-	metadata := FileMetadata{
-		Name:         fu.Name,
-		Size:         0,
-		MimeType:     fu.MimeType,
-		Key:          fu.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
-		LastModified: int(fu.LastModified.UnixMilli()),
-		Created:      int(fu.Created.UnixMilli()),
-		Hash:         fileHash,
-	}
+	metadata := fu.GetRawMeta(api.AuthVersion)
+	metadata.Size = 0
+	metadata.Hash = fileHash
 
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {
@@ -87,15 +71,9 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) 
 }
 
 func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
-	metadata := FileMetadata{
-		Name:         fu.Name,
-		Size:         size,
-		MimeType:     fu.MimeType,
-		Key:          fu.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
-		LastModified: int(fu.LastModified.UnixMilli()),
-		Created:      int(fu.Created.UnixMilli()),
-		Hash:         fileHash,
-	}
+	metadata := fu.GetRawMeta(api.AuthVersion)
+	metadata.Size = size
+	metadata.Hash = fileHash
 
 	metadataStr, err := json.Marshal(metadata)
 	if err != nil {

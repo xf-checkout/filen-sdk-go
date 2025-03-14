@@ -1,6 +1,7 @@
 package types
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/io"
@@ -76,6 +77,28 @@ func (file IncompleteFile) NewFromBase(authVersion int) (*IncompleteFile, error)
 	}, nil
 }
 
+func (file IncompleteFile) GetRawMeta(authVersion int) FileMetadata {
+	return FileMetadata{
+		Name:         file.Name,
+		Size:         0,
+		MimeType:     file.MimeType,
+		Key:          file.EncryptionKey.ToStringWithAuthVersion(authVersion),
+		LastModified: int(file.LastModified.UnixMilli()),
+		Created:      int(file.Created.UnixMilli()),
+		Hash:         "",
+	}
+}
+
+type FileMetadata struct {
+	Name         string `json:"name"`
+	Size         int    `json:"size"`
+	MimeType     string `json:"mime"`
+	Key          string `json:"key"`
+	LastModified int    `json:"lastModified"`
+	Created      int    `json:"creation"`
+	Hash         string `json:"hash"`
+}
+
 // File represents a file on the cloud drive.
 type File struct {
 	IncompleteFile
@@ -127,6 +150,11 @@ type FileSystemObject interface {
 	GetParent() string
 }
 
+type NonRootFileSystemObject interface {
+	FileSystemObject
+	GetMeta(authVersion int) (string, error)
+}
+
 type DirectoryInterface interface {
 	FileSystemObject
 	IsRoot() bool
@@ -144,6 +172,17 @@ func (file File) GetParent() string {
 	return file.ParentUUID
 }
 
+func (file File) GetMeta(authVersion int) (string, error) {
+	meta := file.GetRawMeta(authVersion)
+	meta.Size = file.Size
+	meta.Hash = file.Hash
+	metaStr, err := json.Marshal(meta)
+	if err != nil {
+		return "", fmt.Errorf("marshal file metadata: %w", err)
+	}
+	return string(metaStr), nil
+}
+
 func (dir Directory) GetUUID() string {
 	return dir.UUID
 }
@@ -158,6 +197,18 @@ func (dir Directory) GetParent() string {
 
 func (dir Directory) IsRoot() bool {
 	return false
+}
+
+func (dir Directory) GetMeta(authVersion int) (string, error) {
+	meta := DirectoryMetaData{
+		Name:     dir.Name,
+		Creation: int(dir.Created.Unix()),
+	}
+	metaStr, err := json.Marshal(meta)
+	if err != nil {
+		return "", fmt.Errorf("marshal directory metadata: %w", err)
+	}
+	return string(metaStr), nil
 }
 
 func (root RootDirectory) GetUUID() string {

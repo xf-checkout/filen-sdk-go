@@ -2,7 +2,6 @@ package filen
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"io"
@@ -66,20 +65,11 @@ func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFi
 }
 
 func (api *Filen) UpdateMeta(ctx context.Context, file *types.File) error {
-	metaData := FileMetadata{
-		Name:         file.Name,
-		Size:         file.Size,
-		MimeType:     file.MimeType,
-		Key:          file.EncryptionKey.ToStringWithAuthVersion(api.AuthVersion),
-		LastModified: int(file.LastModified.UnixMilli()),
-		Created:      int(file.Created.UnixMilli()),
-		Hash:         file.Hash,
-	}
-	metadataStr, err := json.Marshal(metaData)
+	metadataStr, err := file.GetMeta(api.AuthVersion)
 	if err != nil {
-		return fmt.Errorf("marshal file metadata: %w", err)
+		return fmt.Errorf("get meta: %w", err)
 	}
-	metadataEncrypted := api.EncryptMeta(string(metadataStr))
+	metadataEncrypted := api.EncryptMeta(metadataStr)
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	nameHashed := api.HashFileName(file.Name)
 
