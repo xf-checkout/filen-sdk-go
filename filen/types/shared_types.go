@@ -144,34 +144,34 @@ func (file File) GetParent() string {
 	return file.ParentUUID
 }
 
-func (directory Directory) GetUUID() string {
-	return directory.UUID
+func (dir Directory) GetUUID() string {
+	return dir.UUID
 }
 
-func (directory Directory) GetName() string {
-	return directory.Name
+func (dir Directory) GetName() string {
+	return dir.Name
 }
 
-func (directory Directory) GetParent() string {
-	return directory.ParentUUID
+func (dir Directory) GetParent() string {
+	return dir.ParentUUID
 }
 
-func (directory Directory) IsRoot() bool {
+func (dir Directory) IsRoot() bool {
 	return false
 }
 
-func (rootDirectory RootDirectory) GetUUID() string {
-	return rootDirectory.UUID
+func (root RootDirectory) GetUUID() string {
+	return root.UUID
 }
 
-func (rootDirectory RootDirectory) GetName() string {
+func (root RootDirectory) GetName() string {
 	return ""
 }
 
-func (rootDirectory RootDirectory) GetParent() string {
+func (root RootDirectory) GetParent() string {
 	return ""
 }
 
-func (rootDirectory RootDirectory) IsRoot() bool {
+func (root RootDirectory) IsRoot() bool {
 	return true
 }
