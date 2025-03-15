@@ -269,6 +269,7 @@ func TestDownloadsFromTSDir(t *testing.T) {
 func TestReadDirectories(t *testing.T) {
 	expectedDirs := map[string]*types.Directory{}
 	expectedFiles := map[string]*types.File{}
+	expectedExtraDirs := map[string]*types.Directory{}
 
 	t.Run("setup", func(t *testing.T) {
 		var err error
@@ -277,6 +278,11 @@ func TestReadDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		expectedDirs["def"] = def
+		extra, err := filen.CreateDirectory(context.Background(), def, "extra")
+		if err != nil {
+			t.Fatal(err)
+		}
+		expectedExtraDirs["extra"] = extra
 		uploads, err := filen.CreateDirectory(context.Background(), baseTestDir, "uploads")
 		if err != nil {
 			t.Fatal(err)
@@ -302,17 +308,16 @@ func TestReadDirectories(t *testing.T) {
 		expectedFiles["abc.txt"] = abc
 	})
 
-	requiredDirs := map[string]*types.Directory{}
-	requiredFiles := map[string]*types.File{}
-
-	for k, v := range expectedDirs {
-		requiredDirs[k] = v
-	}
-	for k, v := range expectedFiles {
-		requiredFiles[k] = v
-	}
-
 	t.Run("Check", func(t *testing.T) {
+		requiredDirs := map[string]*types.Directory{}
+		requiredFiles := map[string]*types.File{}
+
+		for k, v := range expectedDirs {
+			requiredDirs[k] = v
+		}
+		for k, v := range expectedFiles {
+			requiredFiles[k] = v
+		}
 		files, dirs, err := filen.ReadDirectory(context.Background(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
@@ -336,6 +341,54 @@ func TestReadDirectories(t *testing.T) {
 
 		for _, file := range files {
 			if requiredFile, ok := requiredFiles[file.Name]; ok {
+				if !reflect.DeepEqual(file, requiredFile) {
+					t.Fatalf("File %s does not match found:\n%#v\nExpected:\n%#v\n", file.Name, file, requiredFile)
+				}
+				delete(requiredFiles, file.Name)
+			}
+		}
+		if len(requiredFiles) > 0 {
+			t.Fatalf("Missing files: %v\n", requiredFiles)
+		}
+	})
+
+	t.Run("CheckRecursive", func(t *testing.T) {
+		requiredDirs := map[string]*types.Directory{}
+		requiredFiles := map[string]*types.File{}
+
+		for k, v := range expectedDirs {
+			requiredDirs[k] = v
+		}
+		for k, v := range expectedFiles {
+			requiredFiles[k] = v
+		}
+		for k, v := range expectedExtraDirs {
+			requiredDirs[k] = v
+		}
+		files, dirs, err := filen.ListRecursive(context.Background(), baseTestDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		for _, dir := range dirs {
+			if requiredDir, ok := requiredDirs[dir.Name]; ok {
+				if !reflect.DeepEqual(dir, requiredDir) {
+					t.Fatalf("Directory %s does not match found:\n%#v\nExpected:\n%#v\n", dir.Name, dir, requiredDir)
+				}
+				delete(requiredDirs, dir.Name)
+			}
+		}
+
+		if len(requiredDirs) > 0 {
+			for k, v := range requiredDirs {
+				fmt.Printf("%s: %#v\n", k, v)
+			}
+			t.Fatalf("Missing directories")
+		}
+
+		for _, file := range files {
+			if requiredFile, ok := requiredFiles[file.Name]; ok {
+				file.Hash = requiredFile.Hash // todo remove tmrw when hashing is fixed
 				if !reflect.DeepEqual(file, requiredFile) {
 					t.Fatalf("File %s does not match found:\n%#v\nExpected:\n%#v\n", file.Name, file, requiredFile)
 				}

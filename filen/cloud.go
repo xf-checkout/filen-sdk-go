@@ -9,6 +9,7 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/util"
 	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -194,6 +195,82 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 	}
 
 	return files, directories, nil
+}
+
+func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterface) ([]*types.File, []*types.Directory, error) {
+	resp, err := api.Client.PostV3DirDownload(ctx, dir.GetUUID())
+	if err != nil {
+		return nil, nil, fmt.Errorf("ListRecursive fetching directory: %w", err)
+	}
+	files := make([]*types.File, len(resp.Files))
+	dirs := make([]*types.Directory, len(resp.Folders))
+
+	for i, file := range resp.Files {
+		metaStr, err := api.DecryptMeta(file.Metadata)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
+		}
+		metadata := types.FileMetadata{}
+		err = json.Unmarshal([]byte(metaStr), &metadata)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive unmarshalling metadata: %v", err)
+		}
+
+		encryptionKey, err := crypto.MakeEncryptionKeyFromUnknownStr(metadata.Key)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive creating encryption key: %v", err)
+		}
+
+		size, err := strconv.Atoi(file.Size)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive parsing size: %v", err)
+		}
+
+		files[i] = &types.File{
+			IncompleteFile: types.IncompleteFile{
+				UUID:          file.UUID,
+				Name:          metadata.Name,
+				MimeType:      metadata.MimeType,
+				EncryptionKey: *encryptionKey,
+				Created:       util.TimestampToTime(int64(metadata.Created)),
+				LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
+				ParentUUID:    file.Parent,
+			},
+			Size:      size,
+			Favorited: false, // doesn't return favorited todo add tmrw when backend is updated
+			Region:    file.Region,
+			Bucket:    file.Bucket,
+			Chunks:    file.Chunks,
+			Hash:      "", // doesn't return hashes todo add tmrw when backend is updated
+		}
+	}
+
+	for i, directory := range resp.Folders {
+		metaStr, err := api.DecryptMeta(directory.Metadata)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
+		}
+		metaData := types.DirectoryMetaData{}
+		err = json.Unmarshal([]byte(metaStr), &metaData)
+		if err != nil {
+			return nil, nil, fmt.Errorf("ListRecursive unmarshalling metadata: %v", err)
+		}
+
+		creationTimestamp := metaData.Creation
+		if creationTimestamp == 0 {
+			creationTimestamp = directory.Timestamp
+		}
+
+		dirs[i] = &types.Directory{
+			UUID:       directory.UUID,
+			Name:       metaData.Name,
+			ParentUUID: directory.Parent,
+			Color:      "", // doesn't return colors todo add tmrw when backend is updated
+			Created:    util.TimestampToTime(int64(creationTimestamp)),
+			Favorited:  false, // doesn't return favorited value todo add tmrw when backend is updated
+		}
+	}
+	return files, dirs, nil
 }
 
 // TrashFile moves a file to trash.
