@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
 
@@ -17,7 +18,7 @@ type V3UploadResponse struct {
 // PostV3Upload uploads a file chunk to the storage backend.
 func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (*V3UploadResponse, error) {
 	// build request
-	dataHash := hex.EncodeToString(crypto.RunSHA521(data))
+	dataHash := hex.EncodeToString(crypto.RunSHA512(data))
 	url := &FilenURL{
 		Type: URLTypeIngest,
 		Path: fmt.Sprintf("/v3/upload?uuid=%s&index=%v&parent=%s&uploadKey=%s&hash=%s",
@@ -35,7 +36,7 @@ func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, pa
 		return nil, err
 	}
 
-	if response.Status == false {
+	if !response.Status {
 		return nil, errors.New("Cannot upload file chunk: " + response.Message)
 	}
 

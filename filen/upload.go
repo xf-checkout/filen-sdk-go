@@ -6,13 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"hash"
 	"io"
 	"strconv"
 	"sync"
+
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
 type FileUpload struct {
@@ -47,7 +48,7 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *FileUpload) *client.V3U
 		UUID:       fu.UUID,
 		Name:       api.EncryptMeta(fu.Name),
 		NameHashed: api.HashFileName(fu.Name),
-		Size:       "0",
+		Size:       api.EncryptMeta("0"),
 		Parent:     fu.ParentUUID,
 		MimeType:   api.EncryptMeta(fu.MimeType),
 		//Metadata: must be filled by caller
@@ -81,7 +82,7 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash str
 	}
 	emptyRequest := api.makeEmptyRequestFromUploaderNoMeta(fu)
 	emptyRequest.Metadata = api.EncryptMeta(string(metadataStr))
-	emptyRequest.Size = strconv.Itoa(size)
+	emptyRequest.Size = api.EncryptMeta(strconv.Itoa(size))
 
 	return &client.V3UploadDoneRequest{
 		V3UploadEmptyRequest: *emptyRequest,

@@ -7,7 +7,7 @@ import (
 	"math/big"
 )
 
-func RunSHA521(b []byte) []byte {
+func RunSHA512(b []byte) []byte {
 	hasher := sha512.New()
 	hasher.Write(b)
 	return hasher.Sum(nil)

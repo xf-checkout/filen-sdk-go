@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
 
@@ -9,7 +10,7 @@ type V3UploadEmptyRequest struct {
 	UUID       string                 `json:"uuid"`
 	Name       crypto.EncryptedString `json:"name"`
 	NameHashed string                 `json:"nameHashed"`
-	Size       string                 `json:"size"`
+	Size       crypto.EncryptedString `json:"size"`
 	Parent     string                 `json:"parent"`
 	MimeType   crypto.EncryptedString `json:"mime"`
 	Metadata   crypto.EncryptedString `json:"metadata"`
