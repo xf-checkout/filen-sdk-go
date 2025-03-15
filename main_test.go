@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/joho/godotenv"
 	"io"
@@ -89,6 +90,25 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
+func getCompatTestFile(parent types.DirectoryInterface) (*types.IncompleteFile, io.Reader, error) {
+	creationTime := time.Date(2025, time.January, 11, 12, 13, 14, 15*1000*1000, time.Local)
+	modificationTime := time.Date(2025, time.January, 11, 12, 13, 14, 16*1000*1000, time.Local)
+	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", creationTime, modificationTime, parent)
+	if err != nil {
+		return nil, nil, err
+	}
+	setKey, err := crypto.MakeEncryptionKeyFromStr("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	if err != nil {
+		return nil, nil, err
+	}
+	incompleteFile.EncryptionKey = *setKey
+	specificFile, err := os.Open("test_files/large_sample-20mb.txt")
+	if err != nil {
+		return nil, nil, err
+	}
+	return incompleteFile, specificFile, nil
+}
+
 // TestUploadsToGoDir uploads test files and directories to the "go" directory
 // this is so the TS sdk can validate these files on its side and check if they are compatible
 // there should ideally be a TestDownloadsFromTSDir that validates files from the TS sdk
@@ -152,6 +172,15 @@ func TestUploadsToGoDir(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	testCompatFile, compatFileReader, err := getCompatTestFile(goDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = filen.UploadFile(context.Background(), testCompatFile, compatFileReader)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestDownloadsFromTSDir(t *testing.T) {
@@ -206,6 +235,34 @@ func TestDownloadsFromTSDir(t *testing.T) {
 	}
 	if len(bigBytes) != 1024*1024*4*2 {
 		t.Fatalf("expected big file to be 8MB, was instead %d bytes", len(bigBytes))
+	}
+
+	goSideCompatFile, goSideReader, err := getCompatTestFile(tsDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tsSideCompatFile, err := filen.FindFile(context.Background(), path.Join("compat-ts", goSideCompatFile.Name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tsSideCompatFile == nil {
+		fmt.Printf("WARNING: could not find compatibility file %s, skipping compatibility check\n", goSideCompatFile.Name)
+		return
+	}
+	tsSideCompatFileBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), tsSideCompatFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	goSideCompatFileBytes, err := io.ReadAll(goSideReader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(tsSideCompatFileBytes, goSideCompatFileBytes) {
+		t.Fatal("compatibility file contents did not match")
+	}
+	goSideCompatFile.UUID = tsSideCompatFile.UUID
+	if !reflect.DeepEqual(goSideCompatFile, tsSideCompatFile.IncompleteFile) {
+		t.Fatalf("compatibility file objects did not go side:\n%#v\nTS side:\n%#v", goSideCompatFile, tsSideCompatFile.IncompleteFile)
 	}
 }
 
