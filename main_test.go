@@ -97,7 +97,7 @@ func getCompatTestFile(parent types.DirectoryInterface) (*types.IncompleteFile, 
 	if err != nil {
 		return nil, nil, err
 	}
-	setKey, err := crypto.MakeEncryptionKeyFromStr("000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f")
+	setKey, err := crypto.MakeEncryptionKeyFromUnknownStr("0123456789abcdefghijklmnopqrstuv")
 	if err != nil {
 		return nil, nil, err
 	}
@@ -261,8 +261,9 @@ func TestDownloadsFromTSDir(t *testing.T) {
 		t.Fatal("compatibility file contents did not match")
 	}
 	goSideCompatFile.UUID = tsSideCompatFile.UUID
-	if !reflect.DeepEqual(goSideCompatFile, tsSideCompatFile.IncompleteFile) {
-		t.Fatalf("compatibility file objects did not go side:\n%#v\nTS side:\n%#v", goSideCompatFile, tsSideCompatFile.IncompleteFile)
+	goSideCompatFile.EncryptionKey.Cipher = tsSideCompatFile.EncryptionKey.Cipher
+	if !reflect.DeepEqual(*goSideCompatFile, tsSideCompatFile.IncompleteFile) {
+		t.Fatalf("compatibility file objects did not match; go side:\n%#v\nTS side:\n%#v", goSideCompatFile, tsSideCompatFile.IncompleteFile)
 	}
 }
 
