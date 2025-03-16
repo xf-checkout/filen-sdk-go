@@ -202,10 +202,10 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 	if err != nil {
 		return nil, nil, fmt.Errorf("ListRecursive fetching directory: %w", err)
 	}
-	files := make([]*types.File, len(resp.Files))
-	dirs := make([]*types.Directory, len(resp.Folders))
+	files := make([]*types.File, 0, len(resp.Files))
+	dirs := make([]*types.Directory, 0, len(resp.Folders))
 
-	for i, file := range resp.Files {
+	for _, file := range resp.Files {
 		metaStr, err := api.DecryptMeta(file.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
@@ -221,12 +221,7 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 			return nil, nil, fmt.Errorf("ListRecursive creating encryption key: %v", err)
 		}
 
-		size, err := strconv.Atoi(file.Size)
-		if err != nil {
-			return nil, nil, fmt.Errorf("ListRecursive parsing size: %v", err)
-		}
-
-		files[i] = &types.File{
+		files = append(files, &types.File{
 			IncompleteFile: types.IncompleteFile{
 				UUID:          file.UUID,
 				Name:          metadata.Name,
@@ -236,16 +231,20 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 				LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
 				ParentUUID:    file.Parent,
 			},
-			Size:      size,
+			Size:      metadata.Size,
 			Favorited: false, // doesn't return favorited todo add tmrw when backend is updated
 			Region:    file.Region,
 			Bucket:    file.Bucket,
 			Chunks:    file.Chunks,
 			Hash:      "", // doesn't return hashes todo add tmrw when backend is updated
-		}
+		})
 	}
 
-	for i, directory := range resp.Folders {
+	for _, directory := range resp.Folders {
+		if directory.Parent == "base" {
+			// /v3/dir/download returns the dir it was called on as well with parent base
+			continue
+		}
 		metaStr, err := api.DecryptMeta(directory.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
@@ -261,14 +260,14 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 			creationTimestamp = directory.Timestamp
 		}
 
-		dirs[i] = &types.Directory{
+		dirs = append(dirs, &types.Directory{
 			UUID:       directory.UUID,
 			Name:       metaData.Name,
 			ParentUUID: directory.Parent,
 			Color:      "", // doesn't return colors todo add tmrw when backend is updated
 			Created:    util.TimestampToTime(int64(creationTimestamp)),
 			Favorited:  false, // doesn't return favorited value todo add tmrw when backend is updated
-		}
+		})
 	}
 	return files, dirs, nil
 }
