@@ -3,6 +3,7 @@ package filen
 import (
 	"context"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"io"
 	"os"
@@ -64,18 +65,32 @@ func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFi
 	return api.UploadFile(ctx, file, r)
 }
 
-func (api *Filen) UpdateMeta(ctx context.Context, file *types.File) error {
-	metadataStr, err := file.GetMeta(api.AuthVersion)
+func (api *Filen) UpdateFileMeta(ctx context.Context, file *types.File, metaEncrypted crypto.EncryptedString, nameHashed string) error {
+	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
+	return api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metaEncrypted)
+}
+
+func (api *Filen) UpdateDirMeta(ctx context.Context, dir *types.Directory, metaEncrypted crypto.EncryptedString, nameHashed string) error {
+	return api.Client.PostV3DirMetadata(ctx, dir.UUID, nameHashed, metaEncrypted)
+}
+
+func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemObject) error {
+	metaStr, err := item.GetMeta(api.AuthVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
 	}
-	metadataEncrypted := api.EncryptMeta(metadataStr)
-	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
-	nameHashed := api.HashFileName(file.Name)
+	metaEncrypted := api.EncryptMeta(metaStr)
 
-	err = api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metadataEncrypted)
-	if err != nil {
-		return fmt.Errorf("post v3 file metadata: %w", err)
+	nameHashed := api.HashFileName(item.GetName())
+
+	if dir, ok := item.(*types.Directory); ok {
+		err = api.UpdateDirMeta(ctx, dir, metaEncrypted, nameHashed)
+	} else if file, ok := item.(*types.File); ok {
+		err = api.UpdateFileMeta(ctx, file, metaEncrypted, nameHashed)
+	} else {
+		return fmt.Errorf("unknown item type")
 	}
-	return nil
+
+	return api.updateItemWithMaybeSharedParent(ctx, item)
+
 }

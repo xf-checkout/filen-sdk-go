@@ -9,7 +9,9 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
@@ -416,4 +418,36 @@ func (h HMACKey) Hash(data []byte) string {
 	hasher := hmac.New(sha256.New, h[:])
 	hasher.Write(data)
 	return hex.EncodeToString(hasher.Sum(nil))
+}
+
+func V2Hash(data []byte) string {
+	outerHasher := sha1.New()
+	innerHasher := sha512.New()
+	innerHasher.Write(data)
+	outerHasher.Write([]byte(hex.EncodeToString(innerHasher.Sum(nil))))
+	return hex.EncodeToString(outerHasher.Sum(nil))
+}
+
+func PublicEncrypt(publicKey *rsa.PublicKey, data string) (EncryptedString, error) {
+	encrypted, err := rsa.EncryptOAEP(sha512.New(), rand.Reader, publicKey, []byte(data), nil)
+	if err != nil {
+		return "", err
+	}
+	return EncryptedString(base64.StdEncoding.EncodeToString(encrypted)), nil
+}
+
+func PublicKeyFromString(pubKey string) (*rsa.PublicKey, error) {
+	publicKeyDecoded, err := base64.StdEncoding.DecodeString(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("decoding public key: %v", err)
+	}
+	publicKeyAny, err := x509.ParsePKIXPublicKey(publicKeyDecoded)
+	if err != nil {
+		return nil, fmt.Errorf("parsing public key: %v", err)
+	}
+	publicKey, ok := publicKeyAny.(*rsa.PublicKey)
+	if !ok {
+		return nil, fmt.Errorf("parsing public key, failed to cast: %v", err)
+	}
+	return publicKey, nil
 }

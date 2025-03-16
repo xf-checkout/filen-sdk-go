@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/util"
 	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -303,17 +303,78 @@ func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInt
 	if err != nil {
 		return nil, err
 	}
-	return &types.Directory{
+
+	dir := &types.Directory{
 		UUID:       response.UUID,
 		Name:       name,
 		ParentUUID: parent.GetUUID(),
 		Color:      types.DirColorDefault,
 		Created:    creationTime,
 		Favorited:  false,
-	}, nil
+	}
+
+	return dir, api.updateItemWithMaybeSharedParent(ctx, dir)
 }
 
 // TrashDirectory moves a directory to trash.
 func (api *Filen) TrashDirectory(ctx context.Context, dir types.DirectoryInterface) error {
 	return api.Client.PostV3DirTrash(ctx, dir.GetUUID())
+}
+
+func (api *Filen) FileExists(ctx context.Context, parentUUID string, name string) (*client.V3FileExistsResponse, error) {
+	nameHashed := api.HashFileName(name)
+	return api.Client.PostV3FileExists(ctx, nameHashed, parentUUID)
+}
+
+func (api *Filen) DirExists(ctx context.Context, parentUUID string, name string) (*client.V3DirExistsResponse, error) {
+	nameHashed := api.HashFileName(name)
+	return api.Client.PostV3DirExists(ctx, nameHashed, parentUUID)
+}
+
+func (api *Filen) MoveFile(ctx context.Context, file *types.File, newParentUUID string, overwrite bool) error {
+	resp, err := api.FileExists(ctx, newParentUUID, file.GetName())
+	if err != nil {
+		return fmt.Errorf("FileExists: %w", err)
+	}
+	if resp.Exists {
+		if overwrite {
+			err = api.TrashFile(ctx, *file)
+			if err != nil {
+				return fmt.Errorf("TrashFile: %w", err)
+			}
+		} else {
+			return fmt.Errorf("file already exists")
+		}
+	}
+
+	err = api.Client.PostV3FileMove(ctx, file.GetUUID(), newParentUUID)
+	if err != nil {
+		return fmt.Errorf("PostV3FileMove: %w", err)
+	}
+	file.ParentUUID = newParentUUID
+	return api.updateItemWithMaybeSharedParent(ctx, file)
+}
+
+func (api *Filen) MoveDir(ctx context.Context, dir *types.Directory, newParentUUID string, overwrite bool) error {
+	resp, err := api.DirExists(ctx, newParentUUID, dir.GetName())
+	if err != nil {
+		return fmt.Errorf("DirExists: %w", err)
+	}
+	if resp.Exists {
+		if overwrite {
+			err = api.TrashDirectory(ctx, *dir)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("directory already exists")
+		}
+	}
+
+	err = api.Client.PostV3DirMove(ctx, dir.GetUUID(), newParentUUID)
+	if err != nil {
+		return fmt.Errorf("PostV3DirMove: %w", err)
+	}
+	dir.ParentUUID = newParentUUID
+	return api.updateItemWithMaybeSharedParent(ctx, dir)
 }

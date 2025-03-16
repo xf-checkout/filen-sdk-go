@@ -199,7 +199,7 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 		wg.Wait()
 		close(done)
 	}()
-
+	var completeFile *types.File
 	select {
 	case <-done:
 		select {
@@ -207,10 +207,14 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 			if !ok {
 				return nil, fmt.Errorf("no chunks successfully uploaded")
 			}
-			return api.completeUpload(fileUpload, resp.Bucket, resp.Region, size)
+			var err error
+			completeFile, err = api.completeUpload(fileUpload, resp.Bucket, resp.Region, size)
+			if err != nil {
+				return nil, fmt.Errorf("complete upload: %w", err)
+			}
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done %w", context.Cause(ctx))
 		}
-	case <-ctx.Done():
-		return nil, fmt.Errorf("context done %w", context.Cause(ctx))
-
 	}
+	return completeFile, api.updateItemWithMaybeSharedParent(ctx, completeFile)
 }

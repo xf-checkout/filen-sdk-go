@@ -12,6 +12,7 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"os"
 	"path"
@@ -67,10 +68,10 @@ func setupEnv() error {
 }
 
 func cleanupEnv() error {
-	err := filen.TrashDirectory(context.Background(), baseTestDir)
-	if err != nil {
-		return err
-	}
+	//err := filen.TrashDirectory(context.Background(), baseTestDir)
+	//if err != nil {
+	//	return err
+	//}
 	return nil
 }
 
@@ -746,6 +747,239 @@ func TestPartialRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func requireShared(ctx context.Context, item types.NonRootFileSystemObject) error {
+	if shared, err := filen.IsItemShared(ctx, item); err != nil {
+		return err
+	} else if !shared {
+		return fmt.Errorf("item %s not shared", item.GetName())
+	} else {
+		return nil
+	}
+}
+
+func requireLinked(ctx context.Context, item types.NonRootFileSystemObject) error {
+	if linked, err := filen.IsItemLinked(ctx, item); err != nil {
+		return err
+	} else if !linked {
+		return fmt.Errorf("item %s not linked", item.GetName())
+	} else {
+		return nil
+	}
+}
+
+func TestShareAndLink(t *testing.T) {
+	// set up
+	// /go/share
+	// /go/share/file1.txt
+	// /go/share/dir1
+	// /go/share/dir1/file2.txt
+	// /go/share/dir1/dir2
+	// /go/share/dir1/dir2/file3.txt
+	files := make([]types.File, 0, 3)
+	var addedFile *types.File
+	var dir2 *types.Directory
+	var file3 *types.File
+	dirs := make([]types.Directory, 0, 2)
+	var shareDir *types.Directory
+	shareUser := os.Getenv("TEST_SHARE_EMAIL")
+	if shareUser == "" {
+		t.Skip("TEST_SHARE_EMAIL not set")
+	}
+	t.Run("Setup", func(t *testing.T) {
+		maybeShareDir, err := filen.FindDirectory(context.Background(), path.Join(baseTestDir.Name, "share"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if maybeShareDir != nil {
+			err = filen.TrashDirectory(context.Background(), maybeShareDir)
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		shareDir, err = filen.CreateDirectory(context.Background(), baseTestDir, "share")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		iFile1, err := types.NewIncompleteFile(filen.AuthVersion, "file1.txt", "", time.Now(), time.Now(), shareDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file1, err := filen.UploadFile(context.Background(), iFile1, bytes.NewReader([]byte("Sample!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, *file1)
+
+		dir1, err := filen.CreateDirectory(context.Background(), shareDir, "dir1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dirs = append(dirs, *dir1)
+
+		iFile2, err := types.NewIncompleteFile(filen.AuthVersion, "file2.txt", "", time.Now(), time.Now(), dir1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file2, err := filen.UploadFile(context.Background(), iFile2, bytes.NewReader([]byte("Sample!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, *file2)
+
+		dir2, err = filen.CreateDirectory(context.Background(), dir1, "dir2")
+		if err != nil {
+			t.Fatal(err)
+		}
+		dirs = append(dirs, *dir2)
+
+		iFile3, err := types.NewIncompleteFile(filen.AuthVersion, "file3.txt", "", time.Now(), time.Now(), dir2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		file3, err = filen.UploadFile(context.Background(), iFile3, bytes.NewReader([]byte("Sample!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+		files = append(files, *file3)
+	})
+	t.Run("Share", func(t *testing.T) {
+		err := filen.ShareItemToUser(context.Background(), shareDir, shareUser)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		g, ctx := errgroup.WithContext(context.Background())
+		for _, file := range files {
+			g.Go(func() error {
+				return requireShared(ctx, file)
+			})
+		}
+		for _, dir := range dirs {
+			g.Go(func() error {
+				return requireShared(ctx, dir)
+			})
+		}
+		if err := g.Wait(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("Link", func(t *testing.T) {
+		_, err := filen.PublicLinkItem(context.Background(), shareDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		g, ctx := errgroup.WithContext(context.Background())
+		for _, file := range files {
+			g.Go(func() error {
+				return requireLinked(ctx, file)
+			})
+		}
+		for _, dir := range dirs {
+			g.Go(func() error {
+				return requireLinked(ctx, dir)
+			})
+		}
+		if err := g.Wait(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("Add", func(t *testing.T) {
+		addedDir, err := filen.CreateDirectory(context.Background(), shareDir, "added")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		addedIFile, err := types.NewIncompleteFile(filen.AuthVersion, "added.txt", "", time.Now(), time.Now(), addedDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		addedFile, err = filen.UploadFile(context.Background(), addedIFile, bytes.NewReader([]byte("Sample!")))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		g, ctx := errgroup.WithContext(context.Background())
+		g.Go(func() error {
+			return requireLinked(ctx, addedDir)
+		})
+		g.Go(func() error {
+			return requireLinked(ctx, addedFile)
+		})
+		g.Go(func() error {
+			return requireShared(ctx, addedDir)
+		})
+		g.Go(func() error {
+			return requireShared(ctx, addedFile)
+		})
+		if err := g.Wait(); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("Move", func(t *testing.T) {
+		moveTarget, err := filen.CreateDirectory(context.Background(), shareDir, "move")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = filen.MoveFile(context.Background(), addedFile, moveTarget.GetUUID(), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if addedFile.GetParent() != moveTarget.GetUUID() {
+			t.Fatal("file parent uuid not locally updated")
+		}
+
+		foundAddedFile, err := filen.FindItem(
+			context.Background(),
+			path.Join(baseTestDir.GetName(), shareDir.GetName(), moveTarget.GetName(), addedFile.GetName()),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foundAddedFile == nil {
+			t.Fatal("moved file not found")
+		}
+		if foundAddedFile.GetUUID() != addedFile.GetUUID() {
+			t.Fatal("file uuid not locally updated")
+		}
+
+		err = filen.MoveDir(context.Background(), dir2, moveTarget.GetUUID(), true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if dir2.GetParent() != moveTarget.GetUUID() {
+			t.Fatal("dir parent uuid not locally updated")
+		}
+
+		foundDir2, err := filen.FindDirectory(
+			context.Background(),
+			path.Join(baseTestDir.GetName(), shareDir.GetName(), moveTarget.GetName(), dir2.GetName()),
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foundDir2 == nil {
+			t.Fatal("moved dir not found")
+		}
+		if foundDir2.GetUUID() != dir2.GetUUID() {
+			t.Fatal("dir uuid not locally updated")
+		}
+
+		movedFiles, _, err := filen.ReadDirectory(context.Background(), foundDir2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(movedFiles) != 1 {
+			t.Fatal("moved file not found")
+		}
+		if movedFiles[0].GetUUID() != file3.GetUUID() {
+			t.Fatal("moved file uuid not locally updated")
+		}
+	})
 }
 
 func writeTestData(writer io.Writer, length int) error {

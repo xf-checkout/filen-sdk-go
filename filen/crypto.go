@@ -1,9 +1,6 @@
 package filen
 
 import (
-	"crypto/sha1"
-	"crypto/sha512"
-	"encoding/hex"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"strings"
 )
@@ -12,11 +9,7 @@ func (api *Filen) HashFileName(name string) string {
 	name = strings.ToLower(name)
 	switch api.AuthVersion {
 	case 1, 2:
-		outerHasher := sha1.New()
-		innerHasher := sha512.New()
-		innerHasher.Write([]byte(name))
-		outerHasher.Write([]byte(hex.EncodeToString(innerHasher.Sum(nil))))
-		return hex.EncodeToString(outerHasher.Sum(nil))
+		return crypto.V2Hash([]byte(name))
 	default:
 		return api.HMACKey.Hash([]byte(name))
 	}
