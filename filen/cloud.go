@@ -236,7 +236,7 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 			Region:    file.Region,
 			Bucket:    file.Bucket,
 			Chunks:    file.Chunks,
-			Hash:      "", // doesn't return hashes todo add tmrw when backend is updated
+			Hash:      metadata.Hash,
 		})
 	}
 
