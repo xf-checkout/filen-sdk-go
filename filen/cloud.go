@@ -342,7 +342,7 @@ func (api *Filen) MoveFile(ctx context.Context, file *types.File, newParentUUID 
 	}
 	if resp.Exists {
 		if overwrite {
-			err = api.TrashFile(ctx, *file)
+			err := api.Client.PostV3FileTrash(ctx, resp.UUID)
 			if err != nil {
 				return fmt.Errorf("TrashFile: %w", err)
 			}
@@ -366,7 +366,7 @@ func (api *Filen) MoveDir(ctx context.Context, dir *types.Directory, newParentUU
 	}
 	if resp.Exists {
 		if overwrite {
-			err = api.TrashDirectory(ctx, *dir)
+			err := api.Client.PostV3FileTrash(ctx, resp.UUID)
 			if err != nil {
 				return err
 			}
