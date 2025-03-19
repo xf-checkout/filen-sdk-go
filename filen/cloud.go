@@ -232,7 +232,7 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 				ParentUUID:    file.Parent,
 			},
 			Size:      metadata.Size,
-			Favorited: false, // doesn't return favorited todo add tmrw when backend is updated
+			Favorited: file.Favorited,
 			Region:    file.Region,
 			Bucket:    file.Bucket,
 			Chunks:    file.Chunks,
@@ -264,9 +264,9 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 			UUID:       directory.UUID,
 			Name:       metaData.Name,
 			ParentUUID: directory.Parent,
-			Color:      "", // doesn't return colors todo add tmrw when backend is updated
+			Color:      types.DirColor(directory.Color),
 			Created:    util.TimestampToTime(int64(creationTimestamp)),
-			Favorited:  false, // doesn't return favorited value todo add tmrw when backend is updated
+			Favorited:  directory.Favorited,
 		})
 	}
 	return files, dirs, nil

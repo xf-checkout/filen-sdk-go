@@ -33,6 +33,7 @@ type V3DirDownloadResponse struct {
 		MimeType   string `json:"mime"`
 		ChunksSize int    `json:"chunksSize"` // no idea what this is
 		Timestamp  int    `json:"timestamp"`
+		Favorited  bool   `json:"favorited"`
 	} `json:"files"`
 	Folders []struct {
 		UUID     string                 `json:"uuid"`
@@ -40,7 +41,9 @@ type V3DirDownloadResponse struct {
 		Parent   string                 `json:"parent"`
 
 		// optional
-		Timestamp int `json:"timestamp"`
+		Timestamp int    `json:"timestamp"`
+		Color     string `json:"color"`
+		Favorited bool   `json:"favorited"`
 	} `json:"folders"`
 }
 
