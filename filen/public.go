@@ -92,5 +92,26 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 	}
 
 	return api.updateItemWithMaybeSharedParent(ctx, item)
+}
 
+func (api *Filen) Rename(ctx context.Context, item types.NonRootFileSystemObject, newName string) error {
+	oldName := item.GetName()
+	if dir, ok := item.(*types.Directory); ok {
+		dir.Name = newName
+		err := api.UpdateMeta(ctx, item)
+		if err != nil {
+			dir.Name = oldName
+			return fmt.Errorf("update meta: %w", err)
+		}
+	} else if file, ok := item.(*types.File); ok {
+		file.Name = newName
+		err := api.UpdateMeta(ctx, item)
+		if err != nil {
+			file.Name = oldName
+			return fmt.Errorf("update meta: %w", err)
+		}
+	} else {
+		return fmt.Errorf("unknown item type")
+	}
+	return nil
 }

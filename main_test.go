@@ -529,6 +529,28 @@ func TestDirectoryActions(t *testing.T) {
 			t.Fatal("dirOrRoot is not a normal directory")
 		}
 	})
+	t.Run("Rename", func(t *testing.T) {
+		tempPath := "a/g/d"
+		tempDir, err := filen.FindDirectoryOrCreate(context.Background(), tempPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		dir, ok := tempDir.(*types.Directory)
+		if !ok {
+			t.Fatal("dir was not a basic dir")
+		}
+		err = filen.Rename(context.Background(), dir, "e")
+		if err != nil {
+			t.Fatal(err)
+		}
+		foundDir, err := filen.FindDirectoryOrCreate(context.Background(), "a/g/e")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if foundDir == nil {
+			t.Fatal("failed to rename")
+		}
+	})
 	t.Run("Trash", func(t *testing.T) {
 		err := filen.TrashDirectory(context.Background(), directory)
 		if err != nil {
