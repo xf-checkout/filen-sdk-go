@@ -65,12 +65,12 @@ func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFi
 	return api.UploadFile(ctx, file, r)
 }
 
-func (api *Filen) UpdateFileMeta(ctx context.Context, file *types.File, metaEncrypted crypto.EncryptedString, nameHashed string) error {
+func (api *Filen) updateFileMeta(ctx context.Context, file *types.File, metaEncrypted crypto.EncryptedString, nameHashed string) error {
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	return api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metaEncrypted)
 }
 
-func (api *Filen) UpdateDirMeta(ctx context.Context, dir *types.Directory, metaEncrypted crypto.EncryptedString, nameHashed string) error {
+func (api *Filen) updateDirMeta(ctx context.Context, dir *types.Directory, metaEncrypted crypto.EncryptedString, nameHashed string) error {
 	return api.Client.PostV3DirMetadata(ctx, dir.UUID, nameHashed, metaEncrypted)
 }
 
@@ -84,9 +84,9 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 	nameHashed := api.HashFileName(item.GetName())
 
 	if dir, ok := item.(*types.Directory); ok {
-		err = api.UpdateDirMeta(ctx, dir, metaEncrypted, nameHashed)
+		err = api.updateDirMeta(ctx, dir, metaEncrypted, nameHashed)
 	} else if file, ok := item.(*types.File); ok {
-		err = api.UpdateFileMeta(ctx, file, metaEncrypted, nameHashed)
+		err = api.updateFileMeta(ctx, file, metaEncrypted, nameHashed)
 	} else {
 		return fmt.Errorf("unknown item type")
 	}
