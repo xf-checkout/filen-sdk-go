@@ -63,7 +63,7 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 	}
 
 	g, ctx = errgroup.WithContext(ctx)
-	g.SetLimit(MaxSharers)
+	g.SetLimit(MaxSmallCallers)
 	metaData, err := item.GetMeta(api.AuthVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
@@ -175,7 +175,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 	}
 
 	g, gCtx = errgroup.WithContext(ctx)
-	g.SetLimit(MaxSharers)
+	g.SetLimit(MaxSmallCallers)
 
 	for _, user := range sharedResult.Users {
 		key, err := crypto.PublicKeyFromString(user.PublicKey)
@@ -244,7 +244,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(MaxSharers)
+	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
 		meta, err := dir.GetMeta(api.AuthVersion)
@@ -352,7 +352,7 @@ func (api *Filen) shareDirToUser(ctx context.Context, dir *types.Directory, emai
 	}
 
 	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(MaxSharers)
+	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
 		return api.shareItemToUserNonRecursive(ctx, dir, email, key)
