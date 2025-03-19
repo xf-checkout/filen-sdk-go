@@ -277,8 +277,7 @@ func (api *Filen) TrashFile(ctx context.Context, file types.File) error {
 	return api.Client.PostV3FileTrash(ctx, file.GetUUID())
 }
 
-// CreateDirectory creates a new directory.
-func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInterface, name string) (*types.Directory, error) {
+func (api *Filen) CreateDirectoryWithParentUUID(ctx context.Context, parentUUID string, name string) (*types.Directory, error) {
 	if strings.ContainsRune(name, '/') {
 		return nil, fmt.Errorf("invalid directory name")
 	}
@@ -299,7 +298,7 @@ func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInt
 	nameHashed := api.HashFileName(name)
 
 	// send
-	response, err := api.Client.PostV3DirCreate(ctx, directoryUUID, metadataEncrypted, nameHashed, parent.GetUUID())
+	response, err := api.Client.PostV3DirCreate(ctx, directoryUUID, metadataEncrypted, nameHashed, parentUUID)
 	if err != nil {
 		return nil, err
 	}
@@ -307,13 +306,18 @@ func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInt
 	dir := &types.Directory{
 		UUID:       response.UUID,
 		Name:       name,
-		ParentUUID: parent.GetUUID(),
+		ParentUUID: parentUUID,
 		Color:      types.DirColorDefault,
 		Created:    creationTime,
 		Favorited:  false,
 	}
 
 	return dir, api.updateItemWithMaybeSharedParent(ctx, dir)
+}
+
+// CreateDirectory creates a new directory.
+func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInterface, name string) (*types.Directory, error) {
+	return api.CreateDirectoryWithParentUUID(ctx, parent.GetUUID(), name)
 }
 
 // TrashDirectory moves a directory to trash.
