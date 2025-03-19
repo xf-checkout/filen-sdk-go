@@ -392,3 +392,15 @@ func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObje
 		return fmt.Errorf("unknown item type")
 	}
 }
+
+func (api *Filen) EmptyTrash(ctx context.Context) error {
+	return api.Client.PostV3TrashEmpty(ctx)
+}
+
+func (api *Filen) GetUserInfo(ctx context.Context) (*client.V3UserInfoResponse, error) {
+	return api.Client.GetV3UserInfo(ctx)
+}
+
+func (api *Filen) GetDirSize(ctx context.Context, dir *types.Directory) (*client.V3DirSizeResponse, error) {
+	return api.Client.PostV3DirSize(ctx, dir.GetUUID())
+}
