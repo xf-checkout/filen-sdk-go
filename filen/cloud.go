@@ -382,3 +382,13 @@ func (api *Filen) MoveDir(ctx context.Context, dir *types.Directory, newParentUU
 	dir.ParentUUID = newParentUUID
 	return api.updateItemWithMaybeSharedParent(ctx, dir)
 }
+
+func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObject, newParentUUID string, overwrite bool) error {
+	if dir, ok := item.(*types.Directory); ok {
+		return api.MoveDir(ctx, dir, newParentUUID, overwrite)
+	} else if file, ok := item.(*types.File); ok {
+		return api.MoveFile(ctx, file, newParentUUID, overwrite)
+	} else {
+		return fmt.Errorf("unknown item type")
+	}
+}
