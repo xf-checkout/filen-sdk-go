@@ -13,9 +13,10 @@ func RunSHA512(b []byte) []byte {
 	return hasher.Sum(nil)
 }
 
+var runes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+
 // GenerateRandomString generates a cryptographically secure random string based on a selection of alphanumerical characters.
 func GenerateRandomString(length int) string {
-	runes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
 	str := ""
 	for i := 0; i < length; i++ {
 		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(runes))))
@@ -27,6 +28,7 @@ func GenerateRandomString(length int) string {
 	return str
 }
 
+// GenerateRandomBytes generates a cryptographically secure random byte array
 func GenerateRandomBytes(length int) []byte {
 	b := make([]byte, length)
 	// rand.Read fills b with random bytes and never errors according to doc
@@ -38,6 +40,7 @@ func GenerateRandomBytes(length int) []byte {
 }
 
 // Simplified EVP_BytesToKey implementation
+// this is used to decrypt V1 metadata
 func deriveKeyAndIV(key, salt []byte, keyLen, ivLen int) ([]byte, []byte) {
 	keyAndIV := make([]byte, keyLen+ivLen)
 

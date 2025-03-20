@@ -19,11 +19,11 @@ import (
 	"time"
 )
 
-// FindItem find a cloud item by its path and returns it (either the File or the Directory will be returned).
-// Set requireDirectory to differentiate between files and directories with the same path (otherwise, the file will be found).
-// Returns nil for both File and Directory if none was found.
+// FindItem finds a cloud item (file or directory) by its path and returns it.
+// The path should be in the format "dir1/dir2/item", with "/" as the separator.
+// If the path is empty or "/", it returns the root directory.
+// Returns nil if the item is not found.
 func (api *Filen) FindItem(ctx context.Context, path string) (types.FileSystemObject, error) {
-
 	var currentDir types.DirectoryInterface = &api.BaseFolder
 	segments := strings.Split(path, "/")
 	if len(strings.Join(segments, "")) == 0 {
@@ -60,6 +60,9 @@ SegmentsLoop:
 	return nil, nil
 }
 
+// FindFile finds a cloud item by its path and then tries to map it to a file.
+// Returns fs.ErrorIsDir if the item is a directory.
+// Returns nil, nil if the file is not found.
 func (api *Filen) FindFile(ctx context.Context, path string) (*types.File, error) {
 	item, err := api.FindItem(ctx, path)
 	if err != nil {
@@ -75,6 +78,9 @@ func (api *Filen) FindFile(ctx context.Context, path string) (*types.File, error
 	return file, nil
 }
 
+// FindDirectory finds a cloud item by its path and then tries to map it to a directory.
+// Returns fs.ErrorIsFile if the item is a file.
+// Returns nil, nil if the directory is not found.
 func (api *Filen) FindDirectory(ctx context.Context, path string) (types.DirectoryInterface, error) {
 	item, err := api.FindItem(ctx, path)
 	if err != nil {
@@ -90,8 +96,9 @@ func (api *Filen) FindDirectory(ctx context.Context, path string) (types.Directo
 	return directory, nil
 }
 
-// FindDirectoryOrCreate finds a cloud directory by its path and returns its UUID.
+// FindDirectoryOrCreate finds a cloud directory by its path and returns it.
 // If the directory cannot be found, it (and all non-existent parent directories) will be created.
+// This is useful for ensuring a directory path exists before uploading files.
 func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (types.DirectoryInterface, error) {
 	segments := strings.Split(path, "/")
 
@@ -123,7 +130,9 @@ SegmentsLoop:
 	return currentDir, nil
 }
 
-// ReadDirectory fetches the files and directories that are children of a directory (specified by UUID).
+// ReadDirectory fetches the files and directories that are direct children of a directory.
+// It retrieves the encrypted metadata for each item and decrypts it to provide
+// fully populated File and Directory objects.
 func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterface) ([]*types.File, []*types.Directory, error) {
 	// fetch directory content
 	directoryContent, err := api.Client.PostV3DirContent(ctx, dir.GetUUID())
@@ -202,6 +211,9 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 	return files, directories, nil
 }
 
+// ListRecursive fetches all the files and directories that are descendants of a directory
+// in a single backend API call. This is more efficient than multiple ReadDirectory calls
+// when you need to retrieve the entire directory tree.
 func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterface) ([]*types.File, []*types.Directory, error) {
 	resp, err := api.Client.PostV3DirDownload(ctx, dir.GetUUID())
 	if err != nil {
@@ -277,7 +289,8 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 	return files, dirs, nil
 }
 
-// TrashFile moves a file to trash.
+// TrashFile moves a file to the trash.
+// This operation requires a lock to prevent race conditions with other operations.
 func (api *Filen) TrashFile(ctx context.Context, file types.File) error {
 	err := api.Lock(ctx)
 	if err != nil {
@@ -287,6 +300,9 @@ func (api *Filen) TrashFile(ctx context.Context, file types.File) error {
 	return api.Client.PostV3FileTrash(ctx, file.GetUUID())
 }
 
+// CreateDirectoryWithParentUUID creates a new directory as a child of the specified parent UUID.
+// It handles encryption of directory metadata and updating search indexes.
+// Returns the newly created Directory object.
 func (api *Filen) CreateDirectoryWithParentUUID(ctx context.Context, parentUUID string, name string) (*types.Directory, error) {
 	if strings.ContainsRune(name, '/') {
 		return nil, fmt.Errorf("invalid directory name")
@@ -331,12 +347,14 @@ func (api *Filen) CreateDirectoryWithParentUUID(ctx context.Context, parentUUID 
 	return dir, nil
 }
 
-// CreateDirectory creates a new directory.
+// CreateDirectory creates a new directory as a child of the specified parent directory.
+// It uses CreateDirectoryWithParentUUID internally after extracting the parent's UUID.
 func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInterface, name string) (*types.Directory, error) {
 	return api.CreateDirectoryWithParentUUID(ctx, parent.GetUUID(), name)
 }
 
-// TrashDirectory moves a directory to trash.
+// TrashDirectory moves a directory to the trash.
+// This operation requires a lock to prevent race conditions with other operations.
 func (api *Filen) TrashDirectory(ctx context.Context, dir types.DirectoryInterface) error {
 	err := api.Lock(ctx)
 	if err != nil {
@@ -346,16 +364,23 @@ func (api *Filen) TrashDirectory(ctx context.Context, dir types.DirectoryInterfa
 	return api.Client.PostV3DirTrash(ctx, dir.GetUUID())
 }
 
+// FileExists checks if a file with the given name exists in the specified parent directory.
+// It uses the hashed filename for lookup to preserve end-to-end encryption.
 func (api *Filen) FileExists(ctx context.Context, parentUUID string, name string) (*client.V3FileExistsResponse, error) {
 	nameHashed := api.HashFileName(name)
 	return api.Client.PostV3FileExists(ctx, nameHashed, parentUUID)
 }
 
+// DirExists checks if a directory with the given name exists in the specified parent directory.
+// It uses the hashed directory name for lookup to preserve end-to-end encryption.
 func (api *Filen) DirExists(ctx context.Context, parentUUID string, name string) (*client.V3DirExistsResponse, error) {
 	nameHashed := api.HashFileName(name)
 	return api.Client.PostV3DirExists(ctx, nameHashed, parentUUID)
 }
 
+// moveFile moves a file to a new parent directory.
+// If overwrite is true, it will replace any existing file with the same name.
+// Internal helper for MoveItem.
 func (api *Filen) moveFile(ctx context.Context, file *types.File, newParentUUID string, overwrite bool) error {
 	resp, err := api.FileExists(ctx, newParentUUID, file.GetName())
 	if err != nil {
@@ -380,6 +405,9 @@ func (api *Filen) moveFile(ctx context.Context, file *types.File, newParentUUID 
 	return api.updateItemWithMaybeSharedParent(ctx, file)
 }
 
+// moveDir moves a directory to a new parent directory.
+// If overwrite is true, it will replace any existing directory with the same name.
+// Internal helper for MoveItem.
 func (api *Filen) moveDir(ctx context.Context, dir *types.Directory, newParentUUID string, overwrite bool) error {
 	resp, err := api.DirExists(ctx, newParentUUID, dir.GetName())
 	if err != nil {
@@ -404,6 +432,9 @@ func (api *Filen) moveDir(ctx context.Context, dir *types.Directory, newParentUU
 	return api.updateItemWithMaybeSharedParent(ctx, dir)
 }
 
+// MoveItem moves a file or directory to a new parent directory.
+// If overwrite is true, it will replace any existing item with the same name.
+// This operation requires a lock to prevent race conditions with other operations.
 func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObject, newParentUUID string, overwrite bool) error {
 	err := api.Lock(ctx)
 	if err != nil {
@@ -419,19 +450,25 @@ func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObje
 	}
 }
 
+// EmptyTrash permanently deletes all items in the trash.
+// This operation cannot be undone.
 func (api *Filen) EmptyTrash(ctx context.Context) error {
 	return api.Client.PostV3TrashEmpty(ctx)
 }
 
+// GetUserInfo retrieves information about the current user,
+// including account details, storage usage, and quotas.
 func (api *Filen) GetUserInfo(ctx context.Context) (*client.V3UserInfoResponse, error) {
 	return api.Client.GetV3UserInfo(ctx)
 }
 
+// GetDirSize returns the total size, file count, and folder count of a directory,
+// including all its subdirectories and files.
 func (api *Filen) GetDirSize(ctx context.Context, dir *types.Directory) (*client.V3DirSizeResponse, error) {
 	return api.Client.PostV3DirSize(ctx, dir.GetUUID())
 }
 
-// DownloadToPath downloads a file from the cloud to the given downloadPath.
+// DownloadToPath downloads a file from the cloud to the given local path.
 // The file is first downloaded to a temporary file in the same directory,
 // then renamed to the final path. If an error occurs during download or rename,
 // the temporary file is removed.
@@ -474,27 +511,44 @@ func (api *Filen) DownloadToPath(ctx context.Context, file *types.File, download
 	return nil
 }
 
+// GetDownloadReader returns a reader which can be used to stream a file from the cloud.
+// The returned io.ReadCloser should be closed after use to release resources.
+// The reader handles decryption and integrity verification automatically.
 func (api *Filen) GetDownloadReader(ctx context.Context, file *types.File) io.ReadCloser {
 	return newChunkedReader(ctx, api, file)
 }
 
+// GetDownloadReaderWithOffset returns a reader which can be used to stream a file
+// starting at the given offset, reading up to the specified limit.
+// This is useful for range requests or partial downloads.
+// The returned io.ReadCloser should be closed after use to release resources.
 func (api *Filen) GetDownloadReaderWithOffset(ctx context.Context, file *types.File, offset int, limit int) io.ReadCloser {
 	return newChunkedReaderWithOffset(ctx, api, file, offset, limit)
 }
 
+// UploadFromReader uploads a file to the cloud using the provided reader as the data source.
+// The file metadata is taken from the IncompleteFile parameter.
+// The function handles chunking, encryption, and verification automatically.
 func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	return api.UploadFile(ctx, file, r)
 }
 
+// updateFileMeta updates the metadata of a file on the server.
+// This is an internal helper used by UpdateMeta.
 func (api *Filen) updateFileMeta(ctx context.Context, file *types.File, metaEncrypted crypto.EncryptedString, nameHashed string) error {
 	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
 	return api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metaEncrypted)
 }
 
+// updateDirMeta updates the metadata of a directory on the server.
+// This is an internal helper used by UpdateMeta.
 func (api *Filen) updateDirMeta(ctx context.Context, dir *types.Directory, metaEncrypted crypto.EncryptedString, nameHashed string) error {
 	return api.Client.PostV3DirMetadata(ctx, dir.UUID, nameHashed, metaEncrypted)
 }
 
+// UpdateMeta updates the metadata of a file or directory on the server.
+// This operation requires a lock to prevent race conditions with other operations.
+// It also updates search indexes and shared parent metadata.
 func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemObject) error {
 	err := api.Lock(ctx)
 	if err != nil {
@@ -523,6 +577,10 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 	return g.Wait()
 }
 
+// Rename renames a file or directory.
+// This uses UpdateMeta under the hood, but cleanly handles errors and
+// only updates the name in memory if the server update is successful.
+// If the operation fails, the original name is preserved.
 func (api *Filen) Rename(ctx context.Context, item types.NonRootFileSystemObject, newName string) error {
 	oldName := item.GetName()
 	if dir, ok := item.(*types.Directory); ok {
@@ -545,6 +603,9 @@ func (api *Filen) Rename(ctx context.Context, item types.NonRootFileSystemObject
 	return nil
 }
 
+// updateSearchHashes updates the search index for a file or directory.
+// This is called automatically when items are created, renamed, or moved.
+// It generates search hashes that enable encrypted search functionality.
 func (api *Filen) updateSearchHashes(ctx context.Context, item types.NonRootFileSystemObject) error {
 	var typ string
 	if _, ok := item.(*types.Directory); ok {

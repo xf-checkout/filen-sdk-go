@@ -1,4 +1,5 @@
-// Package filen provides an SDK interface to interact with the cloud drive.
+// Package filen provides an SDK interface to interact with the Filen cloud storage service.
+// It handles authentication, encryption/decryption, and all API interactions.
 package filen
 
 import (
@@ -10,36 +11,49 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
-// Filen provides the SDK interface. Needs to be initialized via [New].
+// Filen provides the SDK interface for interacting with Filen cloud storage.
+// It must be initialized using New or NewWithAPIKey.
 type Filen struct {
-	Client      *client.Client
+	// Client is the underlying API client used for all service communication
+	Client *client.Client
+
+	// AuthVersion indicates which authentication scheme is being used (1, 2, or 3)
 	AuthVersion int
 
+	// Email is the user's email address
 	Email string
 
 	// MasterKeys contains the crypto master keys for the current user. When the user changes
 	// their password, a new master key is appended. For decryption, all master keys are tried
-	// until one works; for encryption, always use the latest master key.
+	// until one works; for encryption, always use the latest master key. (AuthVersion 2)
 	MasterKeys crypto.MasterKeys
-	DEK        crypto.EncryptionKey
 
+	// DEK is the Data Encryption Key used for file encryption (AuthVersion 3)
+	DEK crypto.EncryptionKey
+
+	// PrivateKey is the user's RSA private key for asymmetric cryptography operations
 	PrivateKey rsa.PrivateKey
-	PublicKey  rsa.PublicKey
 
+	// PublicKey is the user's RSA public key for asymmetric cryptography operations
+	PublicKey rsa.PublicKey
+
+	// HMACKey is derived from the private key and used for creating file name hashes
 	HMACKey crypto.HMACKey
 
-	// BaseFolderUUID is the UUID of the cloud drive's root directory
+	// BaseFolder is the root directory of the user's cloud storage
 	BaseFolder types.RootDirectory
 
+	// lock provides synchronized access to backend resources
 	lock BackendLock
 }
 
-// New creates a new Filen and initializes it with the given email and password
-// by logging in with the API and preparing the API key and master keys.
+// New creates a new Filen instance and initializes it with the given email and password.
+// It handles login, authentication, and preparation of encryption keys.
+// The appropriate authentication version is automatically determined from the server.
 func New(ctx context.Context, email, password string) (*Filen, error) {
 	unauthorizedClient := client.New(ctx)
 
-	// fetch salt
+	// fetch salt for password derivation
 	authInfo, err := unauthorizedClient.PostV3AuthInfo(ctx, email)
 	if err != nil {
 		return nil, err
@@ -57,7 +71,9 @@ func New(ctx context.Context, email, password string) (*Filen, error) {
 	}
 }
 
-// NewWithAPIKey creates a new Filen and initializes it with the given email, password, and API key
+// NewWithAPIKey creates a new Filen instance using a pre-existing API key.
+// This is useful for scenarios where the login step has already been performed
+// and the API key is stored securely.
 func NewWithAPIKey(ctx context.Context, email, password, apiKey string) (*Filen, error) {
 	c := client.NewWithAPIKey(ctx, apiKey)
 
@@ -78,6 +94,8 @@ func NewWithAPIKey(ctx context.Context, email, password, apiKey string) (*Filen,
 	}
 }
 
+// getKeyPair retrieves and decrypts the user's RSA key pair from the server.
+// The private key is stored encrypted and is decrypted using the provided meta crypter.
 func getKeyPair(ctx context.Context, metaCrypter crypto.MetaCrypter, c *client.Client) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	response, err := c.GetV3UserKeyPairInfo(ctx)
 	if err != nil {
@@ -95,6 +113,8 @@ func getKeyPair(ctx context.Context, metaCrypter crypto.MetaCrypter, c *client.C
 	return privateKey, publicKey, nil
 }
 
+// getMasterKeys retrieves and processes the user's master encryption keys from the server.
+// Master keys are used for file and metadata encryption/decryption.
 func getMasterKeys(ctx context.Context, masterKey crypto.MasterKey, c *client.Client) (crypto.MasterKeys, error) {
 	encryptedMasterKey := masterKey.EncryptMeta(string(masterKey.Bytes[:]))
 	mkResponse, err := c.PostV3UserMasterKeys(ctx, encryptedMasterKey)
@@ -114,6 +134,8 @@ func getMasterKeys(ctx context.Context, masterKey crypto.MasterKey, c *client.Cl
 	return masterKeys, nil
 }
 
+// getDEK retrieves and decrypts the user's Data Encryption Key (DEK) from the server.
+// The DEK is used for file encryption in auth version 3.
 func getDEK(ctx context.Context, kek crypto.EncryptionKey, c *client.Client) (*crypto.EncryptionKey, error) {
 	encryptedDEK, err := c.GetV3UserDEK(ctx)
 	if err != nil {
@@ -130,6 +152,8 @@ func getDEK(ctx context.Context, kek crypto.EncryptionKey, c *client.Client) (*c
 	return dek, nil
 }
 
+// loginV2 performs version 2 authentication with the Filen API.
+// It derives the necessary keys from the password and salt, then performs login.
 func loginV2(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.MasterKey, error) {
 	masterKey, derivedPass, err := crypto.DeriveMKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
@@ -144,6 +168,8 @@ func loginV2(ctx context.Context, email, password string, info client.V3AuthInfo
 	return c, masterKey, nil
 }
 
+// loginV3 performs version 3 authentication with the Filen API.
+// It derives the Key Encryption Key (KEK) from the password and salt, then performs login.
 func loginV3(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.EncryptionKey, error) {
 	kek, derivedPass, err := crypto.DeriveKEKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
@@ -159,6 +185,8 @@ func loginV3(ctx context.Context, email, password string, info client.V3AuthInfo
 	return c, kek, nil
 }
 
+// newV2Authed creates a new Filen instance for auth version 2 with an authenticated client.
+// It sets up all required keys and fetches necessary account information.
 func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoResponse, c *client.Client, masterKey crypto.MasterKey) (*Filen, error) {
 	masterKeys, err := getMasterKeys(ctx, masterKey, c)
 	if err != nil {
@@ -188,6 +216,8 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	}, nil
 }
 
+// newV2 handles the complete initialization process for auth version 2.
+// It performs login and then completes setup with the authenticated client.
 func newV2(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
 	c, masterKey, err := loginV2(ctx, email, password, info, uc)
 	if err != nil {
@@ -197,6 +227,8 @@ func newV2(ctx context.Context, email, password string, info client.V3AuthInfoRe
 	return newV2Authed(ctx, email, info, c, *masterKey)
 }
 
+// newV2WithAPIKey initializes a Filen instance for auth version 2 using a pre-existing API key.
+// It derives the master key from the password but skips the login step.
 func newV2WithAPIKey(ctx context.Context, email, password string, info client.V3AuthInfoResponse, c *client.Client) (*Filen, error) {
 	masterKey, _, err := crypto.DeriveMKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
@@ -206,6 +238,8 @@ func newV2WithAPIKey(ctx context.Context, email, password string, info client.V3
 	return newV2Authed(ctx, email, info, c, *masterKey)
 }
 
+// newV3Authed creates a new Filen instance for auth version 3 with an authenticated client.
+// It sets up all required keys and fetches necessary account information.
 func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoResponse, c *client.Client, kek crypto.EncryptionKey) (*Filen, error) {
 	dek, err := getDEK(ctx, kek, c)
 	if err != nil {
@@ -235,6 +269,8 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	}, nil
 }
 
+// newV3 handles the complete initialization process for auth version 3.
+// It performs login and then completes setup with the authenticated client.
 func newV3(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
 	c, kek, err := loginV3(ctx, email, password, info, uc)
 	if err != nil {
@@ -244,6 +280,8 @@ func newV3(ctx context.Context, email, password string, info client.V3AuthInfoRe
 	return newV3Authed(ctx, email, info, c, *kek)
 }
 
+// newV3WithAPIKey initializes a Filen instance for auth version 3 using a pre-existing API key.
+// It derives the Key Encryption Key (KEK) from the password but skips the login step.
 func newV3WithAPIKey(ctx context.Context, email, password string, info client.V3AuthInfoResponse, c *client.Client) (*Filen, error) {
 	kek, _, err := crypto.DeriveKEKAndAuthFromPassword(password, info.Salt)
 	if err != nil {

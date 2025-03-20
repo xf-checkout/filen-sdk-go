@@ -11,6 +11,9 @@ import (
 	"sync"
 )
 
+// fetchAndDecryptChunk downloads and decrypts a single chunk of a file.
+// It retrieves the encrypted chunk from the Filen servers and decrypts it
+// using the file's encryption key.
 func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, chunkIndex int) ([]byte, error) {
 	// could potentially be optimized by accepting a []byte buffer to reuse
 	encryptedBytes, err := api.Client.DownloadFileChunk(ctx, file.UUID, file.Region, file.Bucket, chunkIndex)
@@ -24,13 +27,18 @@ func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, ch
 	return decryptedBytes, nil
 }
 
-// chunkState represents the state of a single chunk in the buffer
+// chunkState represents the state of a single chunk in the buffer.
+// It handles concurrent access to chunk data and tracks the actual size
+// of the chunk data (which may be less than ChunkSize for the last chunk).
 type chunkState struct {
 	data  [ChunkSize]byte // Fixed-size array for optimal cache locality
 	size  int             // Actual size of data (may be less than ChunkSize for the last chunk)
 	ctxMu types.CtxMutex  // Mutex for this specific chunk
 }
 
+// copyTo copies data from the chunk to the provided output buffer,
+// starting at the specified offset and copying up to maxLength bytes.
+// It respects the context for cancellation and properly synchronizes access.
 func (c *chunkState) copyTo(ctx context.Context, out []byte, offset int, maxLength int) (int, error) {
 	err := c.ctxMu.Lock(ctx)
 	if err != nil {
@@ -50,23 +58,27 @@ func (c *chunkState) copyTo(ctx context.Context, out []byte, offset int, maxLeng
 	return maxLength, nil
 }
 
-// ChunkedReader implements io.Reader for sequential chunked file downloads
+// ChunkedReader implements io.Reader for sequential chunked file downloads.
+// It provides efficient streaming access to files stored in Filen cloud storage
+// by downloading chunks in parallel and validating file integrity.
 type ChunkedReader struct {
-	file              *types.File
-	api               *Filen
-	buffer            []chunkState // Fixed-size circular buffer of chunks
-	chunkIndex        int          // Index of the current chunk being read
-	offsetInChunk     int          // Current offset within the current chunk
-	ctx               context.Context
-	cancel            context.CancelCauseFunc
-	errOnce           *sync.Once
-	hasher            hash.Hash
-	lastChunkIndex    int
-	lastOffsetInChunk int
-	totalRead         int // -1 if we started with an offset
+	file              *types.File             // The file being downloaded
+	api               *Filen                  // API client to use for downloading
+	buffer            []chunkState            // Fixed-size circular buffer of chunks
+	chunkIndex        int                     // Index of the current chunk being read
+	offsetInChunk     int                     // Current offset within the current chunk
+	ctx               context.Context         // Context for cancellation
+	cancel            context.CancelCauseFunc // Function to cancel with cause
+	errOnce           *sync.Once              // Ensures error is reported only once
+	hasher            hash.Hash               // For calculating file hash during download
+	lastChunkIndex    int                     // Index of the last chunk to read
+	lastOffsetInChunk int                     // Last valid offset in the final chunk
+	totalRead         int                     // Total bytes read, -1 if started with an offset
 }
 
-// newChunkedReader creates a new ChunkedReader for sequential reading
+// newChunkedReaderWithOffset creates a new ChunkedReader for sequential reading,
+// starting at the specified byte offset and reading up to the specified limit.
+// If limit is -1, reads to the end of the file.
 func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.File, offset int, limit int) *ChunkedReader {
 	if limit == -1 {
 		limit = file.Size
@@ -118,10 +130,14 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 	return reader
 }
 
+// newChunkedReader creates a new ChunkedReader that reads the entire file
+// from the beginning.
 func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *ChunkedReader {
 	return newChunkedReaderWithOffset(ctx, api, file, 0, -1)
 }
 
+// fetchChunk downloads and decrypts a specific chunk, storing it in the provided
+// chunkState. If an error occurs, it cancels the reader context with the error.
 func (r *ChunkedReader) fetchChunk(c *chunkState, chunkIndex int) {
 	data, err := r.api.fetchAndDecryptChunk(r.ctx, r.file, chunkIndex)
 	if err != nil {
@@ -136,6 +152,9 @@ func (r *ChunkedReader) fetchChunk(c *chunkState, chunkIndex int) {
 	c.size = len(data)
 }
 
+// goFetchChunk asynchronously fetches a chunk in the background.
+// It ensures the chunk is within bounds and properly acquires the mutex
+// for the chunk's buffer slot before starting the fetch operation.
 func (r *ChunkedReader) goFetchChunk(chunkIndex int) {
 	if chunkIndex > r.lastChunkIndex {
 		return
@@ -149,7 +168,9 @@ func (r *ChunkedReader) goFetchChunk(chunkIndex int) {
 	}()
 }
 
-// Read implements io.Reader - optimized for sequential reading
+// Read implements the io.Reader interface, optimized for sequential reading.
+// It reads data from the file in chunks, handling prefetching of future chunks
+// and validating the file hash as data is read.
 func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -210,7 +231,9 @@ func (r *ChunkedReader) Read(p []byte) (n int, err error) {
 	return read, nil
 }
 
-// Close cleans up resources used by the reader
+// Close cleans up resources used by the reader and verifies the file hash
+// if the entire file was read. It should be called when done with the reader
+// to ensure proper cleanup and validation.
 func (r *ChunkedReader) Close() error {
 	r.cancel(fmt.Errorf("reader closed")) // Cancel all ongoing operations
 

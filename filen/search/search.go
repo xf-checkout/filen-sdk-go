@@ -15,6 +15,8 @@ var wordSplitterRegex = regexp.MustCompile(`[\s\-_.;:,]+`)
 var cleanPrefixRegex = regexp.MustCompile(`[^a-z0-9]`)
 var numberRegex = regexp.MustCompile(`\d{3,}`)
 
+// NameSplitter splits an input string into a slice of chunks
+// to be hashed and then used for the global search
 func NameSplitter(input string) []string {
 
 	normalized := strings.ToLower(strings.TrimSpace(input))
@@ -216,6 +218,8 @@ func generateSearchIndexHashes(input string, key crypto.HMACKey) []string {
 	return hashes
 }
 
+// GenerateSearchIndexHashes is a helper function to generate search index hashes
+// for a given input string
 func GenerateSearchIndexHashes(input string, key crypto.HMACKey, uuid string, typ string) []client.V3SearchAddItem {
 	hashes := generateSearchIndexHashes(input, key)
 

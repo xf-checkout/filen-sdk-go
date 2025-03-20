@@ -17,14 +17,19 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
+// fileUpload encapsulates the state of an ongoing file upload.
+// It tracks the file being uploaded and maintains the upload context,
+// encryption key, and hash calculation.
 type fileUpload struct {
-	types.IncompleteFile
-	uploadKey string
-	ctx       context.Context
-	cancel    context.CancelCauseFunc
-	hasher    hash.Hash
+	types.IncompleteFile        // The file being uploaded
+	uploadKey            string // Random key for this upload session
+	ctx                  context.Context
+	cancel               context.CancelCauseFunc
+	hasher               hash.Hash // For calculating file hash during upload
 }
 
+// newFileUpload creates a new fileUpload structure from an IncompleteFile.
+// It initializes a new random upload key and hash calculator for the upload process.
 func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *fileUpload {
 	return &fileUpload{
 		IncompleteFile: *file,
@@ -35,6 +40,9 @@ func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseF
 	}
 }
 
+// uploadChunk encrypts and uploads a single chunk of a file.
+// This function handles the encryption of the chunk before sending it to the server.
+// It returns storage details (bucket and region) for the uploaded chunk.
 func (api *Filen) uploadChunk(fu *fileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
 	response, err := api.Client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
@@ -44,6 +52,8 @@ func (api *Filen) uploadChunk(fu *fileUpload, chunkIndex int, data []byte) (*cli
 	return response, nil
 }
 
+// makeEmptyRequestFromUploaderNoMeta creates a basic upload request without metadata.
+// This is used as a foundation for both regular and empty file uploads.
 func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *fileUpload) *client.V3UploadEmptyRequest {
 	return &client.V3UploadEmptyRequest{
 		UUID:       fu.UUID,
@@ -57,6 +67,8 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *fileUpload) *client.V3U
 	}
 }
 
+// makeEmptyRequestFromUploader creates a complete upload request for an empty file.
+// It includes encrypted metadata and file hash information.
 func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
 	metadata := fu.GetRawMeta(api.AuthVersion)
 	metadata.Size = 0
@@ -72,6 +84,8 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) 
 	return emptyRequest, nil
 }
 
+// makeRequestFromUploader creates a complete upload request for a non-empty file.
+// It includes encrypted metadata, file size, chunk count, and hash information.
 func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
 	metadata := fu.GetRawMeta(api.AuthVersion)
 	metadata.Size = size
@@ -93,6 +107,8 @@ func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash str
 	}, nil
 }
 
+// completeUpload finalizes the upload of a non-empty file.
+// It sends the final metadata to the server and constructs the completed File object.
 func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, size int) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
@@ -114,6 +130,8 @@ func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, s
 	}, nil
 }
 
+// completeUploadEmpty finalizes the upload of an empty (zero-byte) file.
+// It sends the appropriate metadata to the server and constructs the completed File object.
 func (api *Filen) completeUploadEmpty(fu *fileUpload) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
@@ -133,9 +151,19 @@ func (api *Filen) completeUploadEmpty(fu *fileUpload) (*types.File, error) {
 		Chunks:         0,
 		Hash:           fileHash,
 	}, nil
-
 }
 
+// UploadFile uploads a file to Filen cloud storage.
+// It uses the provided IncompleteFile for metadata and reads file content from the io.Reader.
+// The upload process happens in parallel chunks for efficiency.
+// Once upload completes, it returns a File object representing the uploaded file.
+//
+// This method handles:
+// - Chunking the file into manageable pieces
+// - Parallel upload of chunks
+// - Calculating file hash for integrity verification
+// - Finalizing the upload with appropriate metadata
+// - Updating search indexes and shared parent metadata
 func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	defer cancel(nil) // Ensure context is canceled when we exit

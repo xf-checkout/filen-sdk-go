@@ -11,6 +11,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// renameSharedItem updates the metadata of an item that is shared with another user.
+// It encrypts the metadata with the recipient's public key to maintain end-to-end encryption.
 func (api *Filen) renameSharedItem(ctx context.Context, item types.FileSystemObject, receiverId int, metadata string, key rsa.PublicKey) error {
 	encryptedMeta, err := crypto.PublicEncrypt(&key, metadata)
 	if err != nil {
@@ -20,6 +22,8 @@ func (api *Filen) renameSharedItem(ctx context.Context, item types.FileSystemObj
 	return api.Client.PostV3ItemSharedRename(ctx, item.GetUUID(), receiverId, encryptedMeta)
 }
 
+// renameLinkedItem updates the metadata of an item that has a public link.
+// It encrypts the metadata with the link's encryption key to maintain security.
 func (api *Filen) renameLinkedItem(ctx context.Context, item types.FileSystemObject, linkUUID string, encryptedMeta crypto.EncryptedString) error {
 	err := api.Client.PostV3ItemLinkedRename(ctx, item.GetUUID(), linkUUID, encryptedMeta)
 	if err != nil {
@@ -28,6 +32,8 @@ func (api *Filen) renameLinkedItem(ctx context.Context, item types.FileSystemObj
 	return nil
 }
 
+// addItemToDirectoryPublicLink adds an item to an existing directory public link.
+// This is used when items are added to a directory that is already publicly shared.
 func (api *Filen) addItemToDirectoryPublicLink(ctx context.Context, uuid, parentUUID, itemType, linkUUID string, encryptedMeta crypto.EncryptedString, linkKey crypto.EncryptedString) error {
 	return api.Client.PostV3DirLinkAdd(ctx, client.V3DirLinkAddRequest{
 		UUID:       uuid,
@@ -40,6 +46,9 @@ func (api *Filen) addItemToDirectoryPublicLink(ctx context.Context, uuid, parent
 	})
 }
 
+// updateMaybeSharedItem updates the metadata for an item in all its shared contexts.
+// This ensures that when an item is renamed or modified, the changes are visible
+// to all users and public links that have access to it.
 func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootFileSystemObject) error {
 	g, ctx := errgroup.WithContext(ctx)
 
@@ -94,13 +103,20 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 	return nil
 }
 
+// shareData represents the metadata needed to share an item.
+// It is used internally when sharing items with users or through public links.
 type shareData struct {
-	UUID       string
-	ParentUUID string
-	Metadata   string
-	Type       string
+	UUID       string // The UUID of the item
+	ParentUUID string // The UUID of the parent directory
+	Metadata   string // The item's metadata in plaintext
+	Type       string // The type of the item ("file" or "folder")
 }
 
+// updateItemWithMaybeSharedParent updates the shared/linked status of an item
+// if its parent is shared or linked. This ensures that newly created or moved
+// items inherit the sharing properties of their parent directory.
+//
+// This function needs to be called whenever an item is moved, created or renamed.
 func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item types.NonRootFileSystemObject) error {
 	parentUUID := item.GetParent()
 	g, gCtx := errgroup.WithContext(ctx)
@@ -230,10 +246,15 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 	return nil
 }
 
+// publicLinkFile creates a public link for a file.
+// Returns the link UUID which can be used to construct a shareable URL.
 func (api *Filen) publicLinkFile(ctx context.Context, file types.File) (string, error) {
 	return api.Client.PostV3FileLinkEditEnable(ctx, file)
 }
 
+// publicLinkDir creates a public link for a directory and all its contents.
+// This ensures that the entire directory tree is accessible through the link.
+// Returns the link UUID which can be used to construct a shareable URL.
 func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (string, error) {
 	linkUUID := uuid.NewString()
 	key := crypto.GenerateRandomString(32)
@@ -303,6 +324,9 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 	return linkUUID, nil
 }
 
+// PublicLinkItem creates a public link for a file or directory.
+// This link can be shared with anyone, even those without Filen accounts.
+// Returns the LinkUUID for the link, which can be used to construct a shareable URL.
 func (api *Filen) PublicLinkItem(ctx context.Context, item types.NonRootFileSystemObject) (string, error) {
 	if dir, ok := item.(*types.Directory); ok {
 		return api.publicLinkDir(ctx, dir)
@@ -312,6 +336,9 @@ func (api *Filen) PublicLinkItem(ctx context.Context, item types.NonRootFileSyst
 	return "", fmt.Errorf("unknown type: %T", item)
 }
 
+// shareItemToUserNonRecursive shares a single item with another Filen user.
+// It encrypts the item's metadata with the recipient's public key to maintain end-to-end encryption.
+// This function does not share child items if the item is a directory.
 func (api *Filen) shareItemToUserNonRecursive(ctx context.Context, item types.NonRootFileSystemObject, email string, key *rsa.PublicKey) error {
 	metaStr, err := item.GetMeta(api.AuthVersion)
 	if err != nil {
@@ -345,6 +372,8 @@ func (api *Filen) shareItemToUserNonRecursive(ctx context.Context, item types.No
 	return nil
 }
 
+// shareDirToUser shares a directory and all its contents with another Filen user.
+// This ensures that the entire directory tree is accessible to the recipient.
 func (api *Filen) shareDirToUser(ctx context.Context, dir *types.Directory, email string, key *rsa.PublicKey) error {
 	files, dirs, err := api.ListRecursive(ctx, dir)
 	if err != nil {
@@ -375,6 +404,10 @@ func (api *Filen) shareDirToUser(ctx context.Context, dir *types.Directory, emai
 	return nil
 }
 
+// ShareItemToUser shares a file or directory with another Filen user.
+// If the item is a directory, all its contents are shared recursively.
+// This function handles fetching the recipient's public key and encrypting
+// the metadata accordingly to maintain end-to-end encryption.
 func (api *Filen) ShareItemToUser(ctx context.Context, item types.NonRootFileSystemObject, email string) error {
 	publicKeyObj, err := api.Client.PostV3UserPublicKey(ctx, email)
 	if err != nil {
@@ -394,6 +427,8 @@ func (api *Filen) ShareItemToUser(ctx context.Context, item types.NonRootFileSys
 
 }
 
+// IsItemShared checks if an item is shared with other Filen users.
+// Returns true if the item is currently shared with at least one user.
 func (api *Filen) IsItemShared(ctx context.Context, item types.NonRootFileSystemObject) (bool, error) {
 	resp, err := api.Client.PostV3ItemShared(ctx, item.GetUUID())
 	if err != nil {
@@ -402,6 +437,8 @@ func (api *Filen) IsItemShared(ctx context.Context, item types.NonRootFileSystem
 	return resp.Shared, nil
 }
 
+// IsItemLinked checks if an item has a public link.
+// Returns true if the item currently has at least one public link.
 func (api *Filen) IsItemLinked(ctx context.Context, item types.NonRootFileSystemObject) (bool, error) {
 	resp, err := api.Client.PostV3ItemLinked(ctx, item.GetUUID())
 	if err != nil {

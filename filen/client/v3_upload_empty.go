@@ -6,6 +6,7 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
 
+// V3UploadEmptyRequest represents the request structure for creating an empty file.
 type V3UploadEmptyRequest struct {
 	UUID       string                 `json:"uuid"`
 	Name       crypto.EncryptedString `json:"name"`
@@ -17,6 +18,8 @@ type V3UploadEmptyRequest struct {
 	Version    int                    `json:"version"`
 }
 
+// PostV3UploadEmpty calls /v3/upload/empty to create an empty file.
+// This can be used to create placeholder files or zero-byte files.
 func (c *Client) PostV3UploadEmpty(ctx context.Context, request V3UploadEmptyRequest) (*V3UploadDoneResponse, error) {
 	response := &V3UploadDoneResponse{}
 	_, err := c.RequestData(ctx, "POST", GatewayURL("/v3/upload/empty"), request, response)

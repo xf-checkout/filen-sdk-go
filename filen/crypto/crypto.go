@@ -33,19 +33,20 @@ type MetaCrypter interface {
 // EncryptedString denotes that a string is encrypted and can't be used meaningfully before being decrypted.
 type EncryptedString string
 
+// NewEncryptedStringV2 creates a new EncryptedString with the v2 format
 func NewEncryptedStringV2(encrypted []byte, nonce [12]byte) EncryptedString {
 	return EncryptedString("002" + string(nonce[:]) + base64.StdEncoding.EncodeToString(encrypted))
 }
 
+// NewEncryptedStringV3 creates a new EncryptedString with the v3 format
 func NewEncryptedStringV3(encrypted []byte, nonce [12]byte) EncryptedString {
 	return EncryptedString("003" + hex.EncodeToString(nonce[:]) + base64.StdEncoding.EncodeToString(encrypted))
 }
 
-// other
-
-// v1 and v2
+// MasterKeys is a slice of MasterKey, this is used by the V1 and V2 encryption schemes
 type MasterKeys []MasterKey
 
+// NewMasterKeys creates a new MasterKeys slice
 func NewMasterKeys(encryptionKey MasterKey, stringKeys string) (MasterKeys, error) {
 	keys := make([]MasterKey, 0)
 	for _, key := range strings.Split(stringKeys, "|") {
@@ -91,12 +92,16 @@ func (ms *MasterKeys) DecryptMeta(encrypted EncryptedString) (string, error) {
 	return "", fmt.Errorf("unknown metadata format")
 }
 
+// MasterKey is a key used to encrypt and decrypt metadata
+// in the v1 and v2 encryption schemes
 type MasterKey struct {
 	Bytes        [64]byte
 	DerivedBytes [32]byte
 	cipher       cipher.AEAD
 }
 
+// NewMasterKey creates a new MasterKey from a 64 byte key
+// usually this is a string of 64 characters
 func NewMasterKey(key [64]byte) (*MasterKey, error) {
 	derivedKey := pbkdf2.Key(key[:], key[:], 1, 32, sha512.New)
 	derivedBytes := [32]byte{}
@@ -112,13 +117,14 @@ func NewMasterKey(key [64]byte) (*MasterKey, error) {
 	}, nil
 }
 
+// EncryptMeta should be avoided, and Filen.EncryptMeta should be used instead
 func (m *MasterKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte([]byte(GenerateRandomString(12)))
 	encrypted := m.cipher.Seal(nil, nonce[:], []byte(metadata), nil)
 	return NewEncryptedStringV2(encrypted, nonce)
 }
 
-func (m *MasterKey) DecryptMetaV1(metadata EncryptedString) (string, error) {
+func (m *MasterKey) decryptMetaV1(metadata EncryptedString) (string, error) {
 	decoded, err := base64.StdEncoding.DecodeString(string(metadata))
 	if err != nil {
 		return "", fmt.Errorf("failed to decode base64: %w", err)
@@ -146,6 +152,7 @@ func (m *MasterKey) DecryptMetaV1(metadata EncryptedString) (string, error) {
 	return string(plaintext[:len(plaintext)-paddingLen]), nil
 }
 
+// DecryptMetaV2 should be avoided, and Filen.DecryptMeta should be used instead
 func (m *MasterKey) DecryptMetaV2(metadata EncryptedString) (string, error) {
 	nonce := metadata[3:15]
 	decoded, err := base64.StdEncoding.DecodeString(string(metadata[15:]))
@@ -159,9 +166,10 @@ func (m *MasterKey) DecryptMetaV2(metadata EncryptedString) (string, error) {
 	return string(decoded), nil
 }
 
+// DecryptMeta should be avoided, and Filen.DecryptMeta should be used instead
 func (m *MasterKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:8] == "U2FsdGVk" {
-		return m.DecryptMetaV1(metadata)
+		return m.decryptMetaV1(metadata)
 	}
 	switch metadata[0:3] {
 	case "002":
@@ -193,14 +201,17 @@ func (ms *MasterKeys) decryptMeta(metadata EncryptedString, decryptFunc func(m *
 	return "", &AllKeysFailedError{Errors: errs}
 }
 
+// DecryptMetaV1 should be avoided, and Filen.DecryptMeta should be used instead
 func (ms *MasterKeys) DecryptMetaV1(metadata EncryptedString) (string, error) {
-	return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV1)
+	return ms.decryptMeta(metadata, (*MasterKey).decryptMetaV1)
 }
 
+// DecryptMetaV2 should be avoided, and Filen.DecryptMeta should be used instead
 func (ms *MasterKeys) DecryptMetaV2(metadata EncryptedString) (string, error) {
 	return ms.decryptMeta(metadata, (*MasterKey).DecryptMetaV2)
 }
 
+// EncryptMeta should be avoided, and Filen.EncryptMeta should be used instead
 func (ms *MasterKeys) EncryptMeta(metadata string) EncryptedString {
 	// potential null dereference which makes me uncomfortable
 	// this function should only ever be called on non-empty MasterKeys
@@ -209,8 +220,10 @@ func (ms *MasterKeys) EncryptMeta(metadata string) EncryptedString {
 	return (*ms)[0].EncryptMeta(metadata)
 }
 
+// DerivedPassword is derived from the user password, and used to authenticate the user to the backend
 type DerivedPassword string
 
+// DeriveMKAndAuthFromPassword returns a MasterKey and a DerivedPassword
 func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, DerivedPassword, error) {
 	// makes a 128 byte string
 	derived := hex.EncodeToString(pbkdf2.Key([]byte(password), []byte(salt), 200000, 64, sha512.New))
@@ -232,11 +245,14 @@ func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, Deri
 
 // v3
 
+// EncryptionKey is used to encrypt and decrypt data
+// these keys are used as the v3 KEK, DEK and v2/v3 file Keys
 type EncryptionKey struct {
 	Bytes  [32]byte
 	Cipher cipher.AEAD
 }
 
+// MakeNewFileKey returns a new encryption key
 func MakeNewFileKey(authVersion int) (*EncryptionKey, error) {
 	switch authVersion {
 	case 1, 2:
@@ -255,12 +271,14 @@ func MakeNewFileKey(authVersion int) (*EncryptionKey, error) {
 	}
 }
 
+// EncryptMeta should be avoided, and Filen.EncryptMeta should be used instead
 func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	nonce := [12]byte(GenerateRandomBytes(12))
 	encrypted := key.Cipher.Seal(nil, nonce[:], []byte(metadata), nil)
 	return NewEncryptedStringV3(encrypted, nonce)
 }
 
+// DecryptMeta should be avoided, and Filen.DecryptMeta should be used instead
 func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:3] != "003" {
 		return "", fmt.Errorf("unsupported metadata %s format (allowed: 003)", metadata[0:3])
@@ -280,6 +298,8 @@ func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) 
 	return string(decrypted), nil
 }
 
+// MakeEncryptionKeyFromBytes returns a new encryption key
+// from a 32 byte array
 func MakeEncryptionKeyFromBytes(key [32]byte) (*EncryptionKey, error) {
 	c, err := getCipherForKey(key)
 	if err != nil {
@@ -291,6 +311,8 @@ func MakeEncryptionKeyFromBytes(key [32]byte) (*EncryptionKey, error) {
 	}, nil
 }
 
+// MakeEncryptionKeyFromStr returns a new encryption key
+// from a 64 char hex encoded string
 func MakeEncryptionKeyFromStr(key string) (*EncryptionKey, error) {
 	decoded, err := hex.DecodeString(key)
 	if err != nil {
@@ -299,14 +321,19 @@ func MakeEncryptionKeyFromStr(key string) (*EncryptionKey, error) {
 	return MakeEncryptionKeyFromBytes([32]byte(decoded))
 }
 
+// NewEncryptionKey generates a new encryption key using a random 32 byte array
 func NewEncryptionKey() (*EncryptionKey, error) {
 	return MakeEncryptionKeyFromBytes([32]byte(GenerateRandomBytes(32)))
 }
 
+// ToString returns a 64 char hex encoded string representation
+// of the encryption key
 func (key *EncryptionKey) ToString() string {
 	return hex.EncodeToString(key.Bytes[:])
 }
 
+// DeriveKEKAndAuthFromPassword returns a KEK and a DerivedPassword
+// derived from the user password
 func DeriveKEKAndAuthFromPassword(password string, salt string) (*EncryptionKey, DerivedPassword, error) {
 	derived := hex.EncodeToString(argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64))
 
@@ -317,8 +344,8 @@ func DeriveKEKAndAuthFromPassword(password string, salt string) (*EncryptionKey,
 	return kek, DerivedPassword(derived[len(derived)/2:]), nil
 }
 
-// file
-
+// MakeEncryptionKeyFromUnknownStr returns a new encryption key
+// from either a 32 character string or a 64 character hex encoded string
 func MakeEncryptionKeyFromUnknownStr(key string) (*EncryptionKey, error) {
 	switch len(key) {
 	case 32: // v1 & v2
@@ -334,6 +361,8 @@ func (key *EncryptionKey) encrypt(nonce []byte, data []byte) []byte {
 	return key.Cipher.Seal(data[:0], nonce, data, nil)
 }
 
+// EncryptData encrypts file data using the encryption key
+// generates a nonce and prepends it to the data
 func (key *EncryptionKey) EncryptData(data []byte) []byte {
 	nonce := GenerateRandomBytes(12)
 	data = key.encrypt(nonce[:], data)
@@ -348,6 +377,8 @@ func (key *EncryptionKey) decrypt(nonce []byte, data []byte) error {
 	return nil
 }
 
+// DecryptData decrypts file data using the encryption key
+// returns the decrypted data, assumes that the nonce is the first 12 bytes
 func (key *EncryptionKey) DecryptData(data []byte) ([]byte, error) {
 	nonce := data[:12]
 	err := key.decrypt(nonce, data[12:])
@@ -364,6 +395,8 @@ func (key *EncryptionKey) ToStringWithAuthVersion(authVersion int) string {
 	return string(key.Bytes[:])
 }
 
+// RSAKeyPairFromStrings returns a private and public key pair
+// from base64 encoded strings
 func RSAKeyPairFromStrings(privKey string, pubKey string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
 	publicKeyDecoded, err := base64.StdEncoding.DecodeString(pubKey)
 	if err != nil {
@@ -400,8 +433,12 @@ func RSAKeyPairFromStrings(privKey string, pubKey string) (*rsa.PrivateKey, *rsa
 	return privateKey, publicKey, nil
 }
 
+// HMACKey is a 256 bit key used as a generic hashing key
+// any time we want a hash of a string
 type HMACKey [32]byte
 
+// MakeHMACKey derives a 256 bit key from a private key
+// this is to allow a single key to derivable from both V2 and V3 accounts
 func MakeHMACKey(privateKey *rsa.PrivateKey) HMACKey {
 	key := HMACKey{}
 	derivedKey := hkdf.New(sha256.New, privateKey.D.Bytes(), nil, []byte("hmac-sha256-key"))
@@ -414,12 +451,16 @@ func MakeHMACKey(privateKey *rsa.PrivateKey) HMACKey {
 	return key
 }
 
+// Hash hashes a string using the key
 func (h HMACKey) Hash(data []byte) string {
 	hasher := hmac.New(sha256.New, h[:])
 	hasher.Write(data)
 	return hex.EncodeToString(hasher.Sum(nil))
 }
 
+// V2Hash hashes a string using the V2 algorithm
+// this was used before HMACKey was introduced,
+// and is still used in some places for v2 accounts
 func V2Hash(data []byte) string {
 	outerHasher := sha1.New()
 	innerHasher := sha512.New()
@@ -428,6 +469,7 @@ func V2Hash(data []byte) string {
 	return hex.EncodeToString(outerHasher.Sum(nil))
 }
 
+// PublicEncrypt encrypts data using a public key
 func PublicEncrypt(publicKey *rsa.PublicKey, data string) (EncryptedString, error) {
 	encrypted, err := rsa.EncryptOAEP(sha512.New(), rand.Reader, publicKey, []byte(data), nil)
 	if err != nil {
@@ -436,6 +478,7 @@ func PublicEncrypt(publicKey *rsa.PublicKey, data string) (EncryptedString, erro
 	return EncryptedString(base64.StdEncoding.EncodeToString(encrypted)), nil
 }
 
+// PublicKeyFromString returns a public key from a base64 encoded string
 func PublicKeyFromString(pubKey string) (*rsa.PublicKey, error) {
 	publicKeyDecoded, err := base64.StdEncoding.DecodeString(pubKey)
 	if err != nil {

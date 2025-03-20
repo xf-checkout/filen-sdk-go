@@ -6,10 +6,13 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
+// v3dirContentRequest represents the request structure for the directory content endpoint.
 type v3dirContentRequest struct {
 	UUID string `json:"uuid"`
 }
 
+// V3DirContentResponse represents the response structure from the directory content endpoint.
+// It contains lists of files and folders within the requested directory.
 type V3DirContentResponse struct {
 	Uploads []struct {
 		UUID      string                 `json:"uuid"`
@@ -36,7 +39,8 @@ type V3DirContentResponse struct {
 	} `json:"folders"`
 }
 
-// PostV3DirContent calls /v3/dir/content.
+// PostV3DirContent calls /v3/dir/content to retrieve the contents of a directory.
+// It returns files and folders within the specified directory UUID.
 func (c *Client) PostV3DirContent(ctx context.Context, uuid string) (*V3DirContentResponse, error) {
 	directoryContent := &V3DirContentResponse{}
 	_, err := c.RequestData(ctx, "POST", GatewayURL("/v3/dir/content"), v3dirContentRequest{

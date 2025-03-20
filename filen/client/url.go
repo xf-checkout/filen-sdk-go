@@ -1,3 +1,4 @@
+// Package client provides the functionality to interact with the Filen API.
 package client
 
 import (
@@ -5,7 +6,10 @@ import (
 	"strings"
 )
 
+// URL server pools for different Filen service endpoints.
+// These provide load balancing and fallback options.
 var (
+	// gatewayURLs contains the list of available gateway URLs for API requests.
 	gatewayURLs = []string{
 		"https://gateway.filen.io",
 		"https://gateway.filen.net",
@@ -16,6 +20,8 @@ var (
 		"https://gateway.filen-5.net",
 		"https://gateway.filen-6.net",
 	}
+
+	// egestURLs contains the list of available egress URLs for file downloads.
 	egestURLs = []string{
 		"https://egest.filen.io",
 		"https://egest.filen.net",
@@ -26,6 +32,8 @@ var (
 		"https://egest.filen-5.net",
 		"https://egest.filen-6.net",
 	}
+
+	// ingestURLs contains the list of available ingress URLs for file uploads.
 	ingestURLs = []string{
 		"https://ingest.filen.io",
 		"https://ingest.filen.net",
@@ -38,18 +46,28 @@ var (
 	}
 )
 
+// URL type constants define the type of Filen service to use.
 const (
-	URLTypeIngest  = 1
-	URLTypeEgest   = 2
+	// URLTypeIngest represents an upload endpoint URL type
+	URLTypeIngest = 1
+
+	// URLTypeEgest represents a download endpoint URL type
+	URLTypeEgest = 2
+
+	// URLTypeGateway represents an API endpoint URL type
 	URLTypeGateway = 3
 )
 
+// FilenURL represents a URL for Filen API or storage operations.
+// It handles load balancing by randomly selecting a server from the appropriate pool.
 type FilenURL struct {
-	Type      int
-	Path      string
-	CachedUrl string
+	Type      int    // The type of URL (ingest, egest, or gateway)
+	Path      string // The path component of the URL
+	CachedUrl string // The complete URL, cached after first generation
 }
 
+// GatewayURL creates a new FilenURL for API gateway operations with the given path.
+// This is a convenience function for creating gateway URLs, which are the most common.
 func GatewayURL(path string) *FilenURL {
 	return &FilenURL{
 		Type:      URLTypeGateway,
@@ -58,6 +76,10 @@ func GatewayURL(path string) *FilenURL {
 	}
 }
 
+// String returns the complete URL as a string.
+// It randomly selects a server from the appropriate pool on first call,
+// then caches and returns the same URL for subsequent calls.
+// This implements the fmt.Stringer interface.
 func (url *FilenURL) String() string {
 	if url.CachedUrl == "" {
 		var builder strings.Builder

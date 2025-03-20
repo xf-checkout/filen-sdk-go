@@ -11,18 +11,24 @@ import (
 	"io"
 )
 
+// serializableFilen is an internal structure used to serialize and deserialize
+// the Filen SDK state. It contains only the essential data needed to reconstruct
+// a fully functional Filen object, focusing on cryptographic keys and identifiers.
 type serializableFilen struct {
-	APIKey         string
-	AuthVersion    int
-	Email          string
-	MasterKeys     [][64]byte
-	DEK            [32]byte
-	KEK            [32]byte
-	PrivateKey     []byte
-	HMACKey        [32]byte
-	BaseFolderUUID string
+	APIKey         string     // API key for authentication
+	AuthVersion    int        // Authentication version (2 or 3)
+	Email          string     // User's email address
+	MasterKeys     [][64]byte // Master encryption keys
+	DEK            [32]byte   // Data Encryption Key (for auth v3)
+	KEK            [32]byte   // Key Encryption Key (for auth v3)
+	PrivateKey     []byte     // RSA private key in PKCS1 format
+	HMACKey        [32]byte   // Key used for HMAC operations
+	BaseFolderUUID string     // UUID of user's root directory
 }
 
+// serialize converts a Filen instance to a serializable format.
+// It extracts all the necessary cryptographic keys and identifiers
+// needed to later reconstruct the Filen object.
 func (api *Filen) serialize() *serializableFilen {
 	masterKeys := make([][64]byte, len(api.MasterKeys))
 	for i, masterKey := range api.MasterKeys {
@@ -40,6 +46,9 @@ func (api *Filen) serialize() *serializableFilen {
 	}
 }
 
+// deserialize reconstructs a Filen object from its serialized form.
+// It recreates all the cryptographic keys and initializes a new
+// API client with the stored API key.
 func (s *serializableFilen) deserialize() (*Filen, error) {
 	masterKeys := make([]crypto.MasterKey, len(s.MasterKeys))
 	for i, masterKey := range s.MasterKeys {
@@ -77,12 +86,26 @@ func (s *serializableFilen) deserialize() (*Filen, error) {
 	}, nil
 }
 
+// SerializeTo serializes the Filen object to the provided writer.
+// This allows saving the current state of the SDK, including all encryption keys
+// and authentication information, for later restoration without going through
+// the login process again.
+//
+// The serialized data should be treated as sensitive, as it contains encryption keys
+// that could be used to access the user's files if compromised.
 func (api *Filen) SerializeTo(w io.Writer) error {
 	s := api.serialize()
 	encoder := gob.NewEncoder(w)
 	return encoder.Encode(s)
 }
 
+// DeserializeFrom reconstructs a Filen object from previously serialized data.
+// It reads the serialized state from the provided reader and instantiates a
+// fully functional Filen SDK instance with all the necessary encryption keys
+// and authentication details.
+//
+// This allows resuming a session without going through the login and key
+// derivation process again.
 func DeserializeFrom(r io.Reader) (*Filen, error) {
 	var s serializableFilen
 	decoder := gob.NewDecoder(r)
@@ -92,16 +115,25 @@ func DeserializeFrom(r io.Reader) (*Filen, error) {
 	return s.deserialize()
 }
 
+// TSConfig holds the necessary information to initialize a Filen object
+// from the TypeScript SDK. This provides interoperability between the Go
+// and TypeScript implementations of the Filen SDK.
 type TSConfig struct {
-	Email          string
-	MasterKeys     []string
-	APIKey         string
-	PublicKey      string
-	PrivateKey     string
-	AuthVersion    int
-	BaseFolderUUID string
+	Email          string   // User's email address
+	MasterKeys     []string // Master keys as hex strings
+	APIKey         string   // API key for authentication
+	PublicKey      string   // RSA public key
+	PrivateKey     string   // RSA private key
+	AuthVersion    int      // Authentication version (2 or 3)
+	BaseFolderUUID string   // UUID of user's root directory
 }
 
+// NewFromTSConfig creates a new Filen object from a TypeScript SDK configuration.
+// This function serves as a bridge between the TypeScript and Go SDKs, allowing
+// seamless integration in applications that use both languages.
+//
+// It handles the differences in key formats and authentication versions between
+// the TypeScript and Go implementations.
 func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 	switch tsconfig.AuthVersion {
 	case 2:

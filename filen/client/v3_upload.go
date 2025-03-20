@@ -10,12 +10,14 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 )
 
+// V3UploadResponse represents the response structure from the upload endpoint.
 type V3UploadResponse struct {
 	Bucket string `json:"bucket"`
 	Region string `json:"region"`
 }
 
-// PostV3Upload uploads a file chunk to the storage backend.
+// PostV3Upload uploads a file chunk to the Filen storage backend.
+// It handles the direct binary upload to the ingest servers and returns storage metadata.
 func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (*V3UploadResponse, error) {
 	// build request
 	dataHash := hex.EncodeToString(crypto.RunSHA512(data))

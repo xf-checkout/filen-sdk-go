@@ -15,21 +15,29 @@ import (
 	"strings"
 )
 
+// UnauthorizedClient represents a client without authorization
+// that can make requests to endpoints not requiring authentication.
 type UnauthorizedClient struct {
 	httpClient http.Client // cached request client
 }
 
+// Client extends UnauthorizedClient with API key authentication
+// to access protected Filen API endpoints.
 type Client struct {
 	UnauthorizedClient
 	APIKey string // the Filen API key
 }
 
+// New creates a new UnauthorizedClient with the provided context.
+// The context is used to create the underlying HTTP client.
 func New(ctx context.Context) *UnauthorizedClient {
 	return &UnauthorizedClient{
 		httpClient: *fshttp.NewClient(ctx),
 	}
 }
 
+// Authorize creates an authorized Client from an UnauthorizedClient
+// by adding the provided API key.
 func (uc *UnauthorizedClient) Authorize(apiKey string) *Client {
 	return &Client{
 		UnauthorizedClient: *uc,
@@ -37,6 +45,8 @@ func (uc *UnauthorizedClient) Authorize(apiKey string) *Client {
 	}
 }
 
+// NewWithAPIKey creates a new authorized Client with the provided context and API key.
+// This is a convenience function that combines New and Authorize.
 func NewWithAPIKey(ctx context.Context, apiKey string) *Client {
 	return &Client{
 		UnauthorizedClient: *New(ctx),
@@ -44,7 +54,9 @@ func NewWithAPIKey(ctx context.Context, apiKey string) *Client {
 	}
 }
 
-// A RequestError carries information on a failed HTTP request.
+// RequestError carries information on a failed HTTP request.
+// It implements the error interface and provides detailed information
+// about where and why the request failed.
 type RequestError struct {
 	Message         string    // description of where the error occurred
 	Method          string    // HTTP method of the request
@@ -52,6 +64,8 @@ type RequestError struct {
 	UnderlyingError error     // the underlying error
 }
 
+// Error returns a formatted error string for RequestError.
+// It includes the HTTP method, URL, error message, and underlying error if present.
 func (e *RequestError) Error() string {
 	var builder strings.Builder
 	builder.WriteString(e.Method)
@@ -69,6 +83,7 @@ func (e *RequestError) Error() string {
 }
 
 // cannotSendError returns a RequestError from an error that occurred while sending an HTTP request.
+// It formats the error message to indicate a request sending failure.
 func cannotSendError(method string, url *FilenURL, err error) error {
 	return &RequestError{
 		Message:         "Cannot send request",
@@ -78,6 +93,8 @@ func cannotSendError(method string, url *FilenURL, err error) error {
 	}
 }
 
+// buildReaderRequest creates an HTTP request with the provided context, method, URL, and data.
+// It returns the request or an error if the request cannot be created.
 func (uc *UnauthorizedClient) buildReaderRequest(ctx context.Context, method string, url *FilenURL, data io.Reader) (*http.Request, error) {
 	req, err := http.NewRequestWithContext(ctx, method, url.String(), data)
 	if err != nil {
@@ -86,6 +103,8 @@ func (uc *UnauthorizedClient) buildReaderRequest(ctx context.Context, method str
 	return req, nil
 }
 
+// buildReaderRequest creates an HTTP request with the provided context, method, URL, and data.
+// It extends the unauthorized client method by adding the API key authorization header.
 func (c *Client) buildReaderRequest(ctx context.Context, method string, url *FilenURL, data io.Reader) (*http.Request, error) {
 	var request, err = c.UnauthorizedClient.buildReaderRequest(ctx, method, url, data)
 	if err != nil {
@@ -95,6 +114,8 @@ func (c *Client) buildReaderRequest(ctx context.Context, method string, url *Fil
 	return request, nil
 }
 
+// buildJSONRequest creates an HTTP request with JSON content type.
+// It marshals the requestData to JSON and calls buildReaderRequest.
 func (uc *UnauthorizedClient) buildJSONRequest(ctx context.Context, method string, url *FilenURL, requestData any) (*http.Request, error) {
 	var marshalled []byte
 	if requestData != nil {
@@ -112,6 +133,8 @@ func (uc *UnauthorizedClient) buildJSONRequest(ctx context.Context, method strin
 	return req, nil
 }
 
+// buildJSONRequest creates an HTTP request with JSON content type and API key authorization.
+// It extends the unauthorized client method by adding the authorization header.
 func (c *Client) buildJSONRequest(ctx context.Context, method string, url *FilenURL, requestData any) (*http.Request, error) {
 	var request, err = c.UnauthorizedClient.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
@@ -179,6 +202,9 @@ func convertIntoResponseData(method string, url *FilenURL, response *aPIResponse
 	return nil
 }
 
+// Request sends an HTTP request to the Filen API without authorization.
+// It takes the context, HTTP method, URL, and request data as parameters.
+// It returns the API response or an error if the request fails.
 func (uc *UnauthorizedClient) Request(ctx context.Context, method string, url *FilenURL, requestData any) (*aPIResponse, error) {
 	request, err := uc.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
@@ -187,6 +213,10 @@ func (uc *UnauthorizedClient) Request(ctx context.Context, method string, url *F
 	return handleRequest(request, &uc.httpClient, method, url)
 }
 
+// RequestData sends an HTTP request to the Filen API without authorization and unmarshals
+// the response data into the provided output structure.
+// It takes the context, HTTP method, URL, request data, and output data structure as parameters.
+// It returns the API response or an error if the request fails or unmarshalling fails.
 func (uc *UnauthorizedClient) RequestData(ctx context.Context, method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
 	response, err := uc.Request(ctx, method, url, requestData)
 	if err != nil {
@@ -199,6 +229,9 @@ func (uc *UnauthorizedClient) RequestData(ctx context.Context, method string, ur
 	return response, nil
 }
 
+// Request sends an HTTP request to the Filen API with authorization.
+// It takes the context, HTTP method, URL, and request data as parameters.
+// It returns the API response or an error if the request fails.
 func (c *Client) Request(ctx context.Context, method string, url *FilenURL, requestData any) (*aPIResponse, error) {
 	request, err := c.buildJSONRequest(ctx, method, url, requestData)
 	if err != nil {
@@ -207,6 +240,10 @@ func (c *Client) Request(ctx context.Context, method string, url *FilenURL, requ
 	return handleRequest(request, &c.httpClient, method, url)
 }
 
+// RequestData sends an HTTP request to the Filen API with authorization and unmarshals
+// the response data into the provided output structure.
+// It takes the context, HTTP method, URL, request data, and output data structure as parameters.
+// It returns the API response or an error if the request fails or unmarshalling fails.
 func (c *Client) RequestData(ctx context.Context, method string, url *FilenURL, requestData any, outData any) (*aPIResponse, error) {
 	response, err := c.Request(ctx, method, url, requestData)
 	if err != nil {
@@ -221,7 +258,8 @@ func (c *Client) RequestData(ctx context.Context, method string, url *FilenURL, 
 
 // api
 
-// aPIResponse represents a response from the API.
+// aPIResponse represents a response from the Filen API.
+// It contains the status, message, code, and data returned by the API.
 type aPIResponse struct {
 	Status  bool            `json:"status"`  // whether the request was successful
 	Message string          `json:"message"` // additional information
@@ -229,6 +267,8 @@ type aPIResponse struct {
 	Data    json.RawMessage `json:"data"`    // response body, or nil
 }
 
+// CheckError checks if the API response indicates an error.
+// It returns an error if the response status is false.
 func (res *aPIResponse) CheckError() error {
 	if !res.Status {
 		return fmt.Errorf("response error: %s %s", res.Message, res.Code)
@@ -236,6 +276,8 @@ func (res *aPIResponse) CheckError() error {
 	return nil
 }
 
+// String returns a string representation of the API response.
+// It includes the status, message, code, and data.
 func (res *aPIResponse) String() string {
 	return fmt.Sprintf("ApiResponse{status: %t, message: %s, code: %s, data: %s}", res.Status, res.Message, res.Code, res.Data)
 }
@@ -257,7 +299,9 @@ func (res *aPIResponse) IntoData(data any) error {
 
 // file chunks
 
-// DownloadFileChunk downloads a file chunk from the storage backend.
+// DownloadFileChunk downloads a file chunk from the Filen storage backend.
+// It takes the context, file UUID, region, bucket, and chunk index as parameters.
+// It returns the chunk data or an error if the download fails.
 func (c *Client) DownloadFileChunk(ctx context.Context, uuid string, region string, bucket string, chunkIdx int) ([]byte, error) {
 	url := &FilenURL{
 		Type: URLTypeEgest,
