@@ -17,7 +17,7 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
-type FileUpload struct {
+type fileUpload struct {
 	types.IncompleteFile
 	uploadKey string
 	ctx       context.Context
@@ -25,8 +25,8 @@ type FileUpload struct {
 	hasher    hash.Hash
 }
 
-func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *FileUpload {
-	return &FileUpload{
+func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *fileUpload {
+	return &fileUpload{
 		IncompleteFile: *file,
 		uploadKey:      crypto.GenerateRandomString(32),
 		ctx:            ctx,
@@ -35,7 +35,7 @@ func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseF
 	}
 }
 
-func (api *Filen) uploadChunk(fu *FileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
+func (api *Filen) uploadChunk(fu *fileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
 	response, err := api.Client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
 	if err != nil {
@@ -44,7 +44,7 @@ func (api *Filen) uploadChunk(fu *FileUpload, chunkIndex int, data []byte) (*cli
 	return response, nil
 }
 
-func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *FileUpload) *client.V3UploadEmptyRequest {
+func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *fileUpload) *client.V3UploadEmptyRequest {
 	return &client.V3UploadEmptyRequest{
 		UUID:       fu.UUID,
 		Name:       api.EncryptMeta(fu.Name),
@@ -57,7 +57,7 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *FileUpload) *client.V3U
 	}
 }
 
-func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
+func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
 	metadata := fu.GetRawMeta(api.AuthVersion)
 	metadata.Size = 0
 	metadata.Hash = fileHash
@@ -72,7 +72,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) 
 	return emptyRequest, nil
 }
 
-func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
+func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
 	metadata := fu.GetRawMeta(api.AuthVersion)
 	metadata.Size = size
 	metadata.Hash = fileHash
@@ -93,7 +93,7 @@ func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int, fileHash str
 	}, nil
 }
 
-func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, size int) (*types.File, error) {
+func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, size int) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
 	if err != nil {
@@ -114,7 +114,7 @@ func (api *Filen) completeUpload(fu *FileUpload, bucket string, region string, s
 	}, nil
 }
 
-func (api *Filen) completeUploadEmpty(fu *FileUpload) (*types.File, error) {
+func (api *Filen) completeUploadEmpty(fu *fileUpload) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
 	if err != nil {

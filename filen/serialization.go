@@ -11,7 +11,7 @@ import (
 	"io"
 )
 
-type SerializableFilen struct {
+type serializableFilen struct {
 	APIKey         string
 	AuthVersion    int
 	Email          string
@@ -23,12 +23,12 @@ type SerializableFilen struct {
 	BaseFolderUUID string
 }
 
-func (api *Filen) serialize() *SerializableFilen {
+func (api *Filen) serialize() *serializableFilen {
 	masterKeys := make([][64]byte, len(api.MasterKeys))
 	for i, masterKey := range api.MasterKeys {
 		masterKeys[i] = masterKey.Bytes
 	}
-	return &SerializableFilen{
+	return &serializableFilen{
 		APIKey:         api.Client.APIKey,
 		AuthVersion:    api.AuthVersion,
 		Email:          api.Email,
@@ -40,7 +40,7 @@ func (api *Filen) serialize() *SerializableFilen {
 	}
 }
 
-func (s *SerializableFilen) deserialize() (*Filen, error) {
+func (s *serializableFilen) deserialize() (*Filen, error) {
 	masterKeys := make([]crypto.MasterKey, len(s.MasterKeys))
 	for i, masterKey := range s.MasterKeys {
 		masterKey, err := crypto.NewMasterKey(masterKey)
@@ -84,7 +84,7 @@ func (api *Filen) SerializeTo(w io.Writer) error {
 }
 
 func DeserializeFrom(r io.Reader) (*Filen, error) {
-	var s SerializableFilen
+	var s serializableFilen
 	decoder := gob.NewDecoder(r)
 	if err := decoder.Decode(&s); err != nil {
 		return nil, err
