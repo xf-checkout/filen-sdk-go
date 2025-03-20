@@ -947,7 +947,7 @@ func TestShareAndLink(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		err = filen.MoveFile(context.Background(), addedFile, moveTarget.GetUUID(), true)
+		err = filen.MoveItem(context.Background(), addedFile, moveTarget.GetUUID(), true)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -969,7 +969,7 @@ func TestShareAndLink(t *testing.T) {
 			t.Fatal("file uuid not locally updated")
 		}
 
-		err = filen.MoveDir(context.Background(), dir2, moveTarget.GetUUID(), true)
+		err = filen.MoveItem(context.Background(), dir2, moveTarget.GetUUID(), true)
 		if err != nil {
 			t.Fatal(err)
 		}

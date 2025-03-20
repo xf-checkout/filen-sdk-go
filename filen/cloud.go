@@ -338,7 +338,7 @@ func (api *Filen) DirExists(ctx context.Context, parentUUID string, name string)
 	return api.Client.PostV3DirExists(ctx, nameHashed, parentUUID)
 }
 
-func (api *Filen) MoveFile(ctx context.Context, file *types.File, newParentUUID string, overwrite bool) error {
+func (api *Filen) moveFile(ctx context.Context, file *types.File, newParentUUID string, overwrite bool) error {
 	resp, err := api.FileExists(ctx, newParentUUID, file.GetName())
 	if err != nil {
 		return fmt.Errorf("FileExists: %w", err)
@@ -362,7 +362,7 @@ func (api *Filen) MoveFile(ctx context.Context, file *types.File, newParentUUID 
 	return api.updateItemWithMaybeSharedParent(ctx, file)
 }
 
-func (api *Filen) MoveDir(ctx context.Context, dir *types.Directory, newParentUUID string, overwrite bool) error {
+func (api *Filen) moveDir(ctx context.Context, dir *types.Directory, newParentUUID string, overwrite bool) error {
 	resp, err := api.DirExists(ctx, newParentUUID, dir.GetName())
 	if err != nil {
 		return fmt.Errorf("DirExists: %w", err)
@@ -388,9 +388,9 @@ func (api *Filen) MoveDir(ctx context.Context, dir *types.Directory, newParentUU
 
 func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObject, newParentUUID string, overwrite bool) error {
 	if dir, ok := item.(*types.Directory); ok {
-		return api.MoveDir(ctx, dir, newParentUUID, overwrite)
+		return api.moveDir(ctx, dir, newParentUUID, overwrite)
 	} else if file, ok := item.(*types.File); ok {
-		return api.MoveFile(ctx, file, newParentUUID, overwrite)
+		return api.moveFile(ctx, file, newParentUUID, overwrite)
 	} else {
 		return fmt.Errorf("unknown item type")
 	}
