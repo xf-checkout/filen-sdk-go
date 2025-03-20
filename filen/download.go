@@ -24,12 +24,6 @@ func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, ch
 	return decryptedBytes, nil
 }
 
-// Configurable constants
-const (
-	// MaxBufferSize is the number of chunks to keep in memory
-	MaxBufferSize = 8
-)
-
 // chunkState represents the state of a single chunk in the buffer
 type chunkState struct {
 	data  [ChunkSize]byte // Fixed-size array for optimal cache locality
@@ -99,7 +93,7 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
-	bufferSize := min(MaxBufferSize, lastChunkIndex-chunkIndex+1)
+	bufferSize := min(MaxDownloadBufferSize, lastChunkIndex-chunkIndex+1)
 
 	reader := &ChunkedReader{
 		file:              file,
