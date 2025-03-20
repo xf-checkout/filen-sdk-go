@@ -25,12 +25,12 @@ type V3LoginResponse struct {
 
 // PostV3Login calls /v3/login to authenticate a user and obtain an API key.
 // The password should be derived according to Filen's password derivation scheme.
-func (uc *UnauthorizedClient) PostV3Login(ctx context.Context, email string, password crypto.DerivedPassword, authVersion int) (*V3LoginResponse, error) {
+func (uc *UnauthorizedClient) PostV3Login(ctx context.Context, email string, password crypto.DerivedPassword, authVersion int, twoFactorCode string) (*V3LoginResponse, error) {
 	response := &V3LoginResponse{}
 	_, err := uc.RequestData(ctx, "POST", GatewayURL("/v3/login"), v3loginRequest{
 		Email:         email,
 		Password:      string(password),
-		TwoFactorCode: "XXXXXX",
+		TwoFactorCode: twoFactorCode,
 		AuthVersion:   authVersion,
 	}, response)
 	return response, err

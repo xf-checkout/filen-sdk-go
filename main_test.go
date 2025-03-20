@@ -42,7 +42,7 @@ func setupEnv() error {
 		return fmt.Errorf("TEST_EMAIL and TEST_PASSWORD environment variables must be set")
 	}
 	if apiKey == "" {
-		filen, err = sdk.New(context.Background(), email, password)
+		filen, err = sdk.New(context.Background(), email, password, "XXXXXX")
 	} else {
 		filen, err = sdk.NewWithAPIKey(context.Background(), email, password, apiKey)
 	}

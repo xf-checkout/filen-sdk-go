@@ -30,7 +30,7 @@ import (
 )
 
 // Create a new client with email and password
-client, err := filen.New(context.Background(), "your@email.com", "your-password")
+client, err := filen.New(context.Background(), "your@email.com", "your-password", "your-2fa-code") // 2FA code is "XXXXXX" if not enabled
 if err != nil {
     panic(err)
 }

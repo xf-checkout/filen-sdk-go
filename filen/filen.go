@@ -50,7 +50,7 @@ type Filen struct {
 // New creates a new Filen instance and initializes it with the given email and password.
 // It handles login, authentication, and preparation of encryption keys.
 // The appropriate authentication version is automatically determined from the server.
-func New(ctx context.Context, email, password string) (*Filen, error) {
+func New(ctx context.Context, email, password, twoFactorCode string) (*Filen, error) {
 	unauthorizedClient := client.New(ctx)
 
 	// fetch salt for password derivation
@@ -63,9 +63,9 @@ func New(ctx context.Context, email, password string) (*Filen, error) {
 	case 1:
 		panic("unimplemented")
 	case 2:
-		return newV2(ctx, email, password, *authInfo, unauthorizedClient)
+		return newV2(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	case 3:
-		return newV3(ctx, email, password, *authInfo, unauthorizedClient)
+		return newV3(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	default:
 		panic("unimplemented")
 	}
@@ -154,13 +154,13 @@ func getDEK(ctx context.Context, kek crypto.EncryptionKey, c *client.Client) (*c
 
 // loginV2 performs version 2 authentication with the Filen API.
 // It derives the necessary keys from the password and salt, then performs login.
-func loginV2(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.MasterKey, error) {
+func loginV2(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.MasterKey, error) {
 	masterKey, derivedPass, err := crypto.DeriveMKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("DeriveMKAndAuthFromPassword: %w", err)
 	}
 	// for simplicity, I'm going to ignore the fact that response here contains the RSAKeypair
-	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion)
+	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion, twoFactorCode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to log in: %w", err)
 	}
@@ -170,13 +170,13 @@ func loginV2(ctx context.Context, email, password string, info client.V3AuthInfo
 
 // loginV3 performs version 3 authentication with the Filen API.
 // It derives the Key Encryption Key (KEK) from the password and salt, then performs login.
-func loginV3(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.EncryptionKey, error) {
+func loginV3(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.EncryptionKey, error) {
 	kek, derivedPass, err := crypto.DeriveKEKAndAuthFromPassword(password, info.Salt)
 	if err != nil {
 		return nil, nil, fmt.Errorf("DeriveKEKAndAuthFromPassword: %w", err)
 	}
 	// for simplicity, I'm going to ignore the fact that response here contains the RSAKeypair
-	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion)
+	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion, twoFactorCode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to log in: %w", err)
 	}
@@ -218,8 +218,8 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 
 // newV2 handles the complete initialization process for auth version 2.
 // It performs login and then completes setup with the authenticated client.
-func newV2(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
-	c, masterKey, err := loginV2(ctx, email, password, info, uc)
+func newV2(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
+	c, masterKey, err := loginV2(ctx, email, password, twoFactorCode, info, uc)
 	if err != nil {
 		return nil, fmt.Errorf("loginV2: %w", err)
 	}
@@ -271,8 +271,8 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 
 // newV3 handles the complete initialization process for auth version 3.
 // It performs login and then completes setup with the authenticated client.
-func newV3(ctx context.Context, email, password string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
-	c, kek, err := loginV3(ctx, email, password, info, uc)
+func newV3(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
+	c, kek, err := loginV3(ctx, email, password, twoFactorCode, info, uc)
 	if err != nil {
 		return nil, fmt.Errorf("loginV3: %w", err)
 	}
