@@ -130,7 +130,7 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 
 	// Init and prefetch initial chunks
 	for i := 0; i < bufferSize; i++ {
-		reader.buffer[i].ctxMu = types.NewCtxMutex()
+		reader.buffer[(i+chunkIndex)%bufferSize].ctxMu = types.NewCtxMutex()
 		reader.goFetchChunk(i + chunkIndex)
 	}
 	return reader
