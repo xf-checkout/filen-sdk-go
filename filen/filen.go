@@ -183,6 +183,7 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		PublicKey:   *publicKey,
 		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
 		AuthVersion: info.AuthVersion,
+		HMACKey:     crypto.MakeHMACKey(privateKey),
 		lock:        NewBackendLock(),
 	}, nil
 }

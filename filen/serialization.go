@@ -127,6 +127,7 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 			MasterKeys:  masterKeys,
 			PrivateKey:  *privateKey,
 			PublicKey:   *publicKey,
+			HMACKey:     crypto.MakeHMACKey(privateKey),
 			BaseFolder:  types.NewRootDirectory(tsconfig.BaseFolderUUID),
 		}, nil
 	case 3:
