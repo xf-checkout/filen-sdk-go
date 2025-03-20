@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"golang.org/x/sync/errgroup"
 	"hash"
 	"io"
 	"strconv"
@@ -216,5 +217,12 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 			return nil, fmt.Errorf("context done %w", context.Cause(ctx))
 		}
 	}
-	return completeFile, api.updateItemWithMaybeSharedParent(ctx, completeFile)
+
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, completeFile) })
+	g.Go(func() error { return api.updateSearchHashes(gCtx, completeFile) })
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return completeFile, nil
 }

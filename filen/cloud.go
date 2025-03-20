@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/search"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/util"
 	"github.com/google/uuid"
 	"github.com/rclone/rclone/fs"
+	"golang.org/x/sync/errgroup"
 	"io"
 	"os"
 	"path"
@@ -320,7 +322,13 @@ func (api *Filen) CreateDirectoryWithParentUUID(ctx context.Context, parentUUID 
 		Favorited:  false,
 	}
 
-	return dir, api.updateItemWithMaybeSharedParent(ctx, dir)
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, dir) })
+	g.Go(func() error { return api.updateSearchHashes(gCtx, dir) })
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return dir, nil
 }
 
 // CreateDirectory creates a new directory.
@@ -509,7 +517,10 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 		return fmt.Errorf("unknown item type")
 	}
 
-	return api.updateItemWithMaybeSharedParent(ctx, item)
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, item) })
+	g.Go(func() error { return api.updateSearchHashes(gCtx, item) })
+	return g.Wait()
 }
 
 func (api *Filen) Rename(ctx context.Context, item types.NonRootFileSystemObject, newName string) error {
@@ -532,4 +543,17 @@ func (api *Filen) Rename(ctx context.Context, item types.NonRootFileSystemObject
 		return fmt.Errorf("unknown item type")
 	}
 	return nil
+}
+
+func (api *Filen) updateSearchHashes(ctx context.Context, item types.NonRootFileSystemObject) error {
+	var typ string
+	if _, ok := item.(*types.Directory); ok {
+		typ = "directory"
+	} else if _, ok := item.(*types.File); ok {
+		typ = "file"
+	} else {
+		return fmt.Errorf("unknown item type")
+	}
+	nameHashes := search.GenerateSearchIndexHashes(item.GetName(), api.HMACKey, item.GetUUID(), typ)
+	return api.Client.PostV3SearchAdd(ctx, nameHashes)
 }

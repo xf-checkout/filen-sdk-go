@@ -9,6 +9,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/rclone/rclone v1.69.1
 	golang.org/x/crypto v0.35.0
+	golang.org/x/text v0.22.0
 )
 
 require (
