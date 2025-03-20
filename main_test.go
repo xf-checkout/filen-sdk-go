@@ -429,13 +429,8 @@ func TestSerialization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	deserializedClient := deserialized.Client
-	deserialized.Client = filen.Client
-	if !reflect.DeepEqual(filen, deserialized) {
+	if !filenEqual(filen, deserialized) {
 		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, deserialized)
-	}
-	if filen.Client.APIKey != deserializedClient.APIKey {
-		t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, deserializedClient.APIKey)
 	}
 	t.Run("TSConfig", func(t *testing.T) {
 		masterKeys := make([]string, max(len(filen.MasterKeys), 1))
@@ -477,13 +472,8 @@ func TestSerialization(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		deserializedClient = tsDeserialized.Client
-		tsDeserialized.Client = filen.Client
-		if !reflect.DeepEqual(filen, tsDeserialized) {
+		if !filenEqual(filen, tsDeserialized) {
 			t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, tsDeserialized)
-		}
-		if filen.Client.APIKey != deserializedClient.APIKey {
-			t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, deserializedClient.APIKey)
 		}
 	})
 }
@@ -645,13 +635,8 @@ func TestNewWithAPIKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	newClient := filen2.Client
-	filen2.Client = filen.Client
-	if !reflect.DeepEqual(filen, filen2) {
+	if !filenEqual(filen, filen2) {
 		t.Fatalf("Filen objects are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen, filen2)
-	}
-	if filen.Client.APIKey != newClient.APIKey {
-		t.Fatalf("API keys are not equal:\nOriginal:%#v\nDeserialized:%#v\n", filen.Client.APIKey, filen2.Client.APIKey)
 	}
 }
 
@@ -1075,4 +1060,16 @@ func assertFilesEqual(f1 *os.File, f2 *os.File) (bool, error) {
 			return false, nil
 		}
 	}
+}
+
+func filenEqual(f1 *sdk.Filen, f2 *sdk.Filen) bool {
+	return reflect.DeepEqual(f1.AuthVersion, f2.AuthVersion) &&
+		reflect.DeepEqual(f1.Client.APIKey, f2.Client.APIKey) &&
+		reflect.DeepEqual(f1.Email, f2.Email) &&
+		reflect.DeepEqual(f1.MasterKeys, f2.MasterKeys) &&
+		reflect.DeepEqual(f1.DEK, f2.DEK) &&
+		reflect.DeepEqual(f1.PrivateKey, f2.PrivateKey) &&
+		reflect.DeepEqual(f1.PublicKey, f2.PublicKey) &&
+		reflect.DeepEqual(f1.HMACKey, f2.HMACKey) &&
+		reflect.DeepEqual(f1.BaseFolder, f2.BaseFolder)
 }
