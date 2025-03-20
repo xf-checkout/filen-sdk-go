@@ -24,5 +24,5 @@ jobs:
         env:
           TEST_EMAIL: ${{ secrets[format('{0}_TEST_ACC_EMAIL', matrix.version)] }}
           TEST_PASSWORD: ${{ secrets[format('{0}_TEST_ACC_PASS', matrix.version)] }}
-          # TEST_API_KEY: ${{ secrets[format('{0}_TEST_ACC_API_KEY', matrix.version)] }} we're probably not going to get rate limited so don't need this for github runners
+          TEST_SHARE_EMAIL: ${{ secrets['V2_SHARE_ACC_EMAIL'] }}
         run: go test -v ./...
