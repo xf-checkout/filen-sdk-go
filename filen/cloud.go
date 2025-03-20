@@ -143,7 +143,7 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 	// transform files
 	files := make([]*types.File, 0)
 	for _, file := range directoryContent.Uploads {
-		metadataStr, err := api.DecryptMeta(file.Metadata)
+		metadataStr, authVersion, err := api.DecryptMeta(file.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
@@ -171,19 +171,20 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 				LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
 				ParentUUID:    file.Parent,
 			},
-			Size:      metadata.Size,
-			Favorited: file.Favorited == 1,
-			Region:    file.Region,
-			Bucket:    file.Bucket,
-			Chunks:    file.Chunks,
-			Hash:      metadata.Hash,
+			Size:        metadata.Size,
+			Favorited:   file.Favorited == 1,
+			Region:      file.Region,
+			Bucket:      file.Bucket,
+			Chunks:      file.Chunks,
+			Hash:        metadata.Hash,
+			AuthVersion: authVersion,
 		})
 	}
 
 	// transform directories
 	directories := make([]*types.Directory, 0)
 	for _, directory := range directoryContent.Folders {
-		metaStr, err := api.DecryptMeta(directory.Metadata)
+		metaStr, _, err := api.DecryptMeta(directory.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory decrypting metadata: %v", err)
 		}
@@ -223,7 +224,7 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 	dirs := make([]*types.Directory, 0, len(resp.Folders))
 
 	for _, file := range resp.Files {
-		metaStr, err := api.DecryptMeta(file.Metadata)
+		metaStr, authVersion, err := api.DecryptMeta(file.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
 		}
@@ -248,12 +249,13 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 				LastModified:  util.TimestampToTime(int64(metadata.LastModified)),
 				ParentUUID:    file.Parent,
 			},
-			Size:      metadata.Size,
-			Favorited: file.Favorited,
-			Region:    file.Region,
-			Bucket:    file.Bucket,
-			Chunks:    file.Chunks,
-			Hash:      metadata.Hash,
+			Size:        metadata.Size,
+			Favorited:   file.Favorited,
+			Region:      file.Region,
+			Bucket:      file.Bucket,
+			Chunks:      file.Chunks,
+			Hash:        metadata.Hash,
+			AuthVersion: authVersion,
 		})
 	}
 
@@ -262,7 +264,7 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 			// /v3/dir/download returns the dir it was called on as well with parent base
 			continue
 		}
-		metaStr, err := api.DecryptMeta(directory.Metadata)
+		metaStr, _, err := api.DecryptMeta(directory.Metadata)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ListRecursive decrypting metadata: %v", err)
 		}

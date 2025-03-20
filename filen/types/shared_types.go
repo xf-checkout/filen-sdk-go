@@ -132,6 +132,7 @@ type File struct {
 	Bucket         string // The file's storage bucket
 	Chunks         int    // How many 1 MiB chunks the file is partitioned into
 	Hash           string // The file's SHA512 hash
+	AuthVersion    int    // The authentication version used to encrypt the file
 }
 
 // DirColor represents the color assigned to a directory in the Filen UI.

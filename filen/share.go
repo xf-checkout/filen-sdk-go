@@ -217,7 +217,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 	}
 
 	for _, link := range linkedResult.Links {
-		keyStr, err := api.DecryptMeta(link.Key)
+		keyStr, _, err := api.DecryptMeta(link.Key)
 		if err != nil {
 			return fmt.Errorf("decrypt meta: %w", err)
 		}

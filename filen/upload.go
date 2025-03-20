@@ -127,6 +127,7 @@ func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, s
 		Bucket:         bucket,
 		Chunks:         uploadRequest.Chunks,
 		Hash:           fileHash,
+		AuthVersion:    api.AuthVersion,
 	}, nil
 }
 

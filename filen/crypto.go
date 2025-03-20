@@ -35,15 +35,18 @@ func (api *Filen) EncryptMeta(metadata string) crypto.EncryptedString {
 
 // DecryptMeta decrypts metadata, this reads the encrypted string to determine
 // the version, and then uses the MasterKeys or DEK
-func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, error) {
+func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, int, error) {
 	if encrypted[0:8] == "U2FsdGVk" {
-		return api.MasterKeys.DecryptMetaV1(encrypted)
+		decrypted, err := api.MasterKeys.DecryptMetaV1(encrypted)
+		return decrypted, 1, err
 	}
 	switch encrypted[0:3] {
 	case "002":
-		return api.MasterKeys.DecryptMetaV2(encrypted)
+		decrypted, err := api.MasterKeys.DecryptMetaV2(encrypted)
+		return decrypted, 2, err
 	case "003":
-		return api.DEK.DecryptMeta(encrypted)
+		decrypted, err := api.DEK.DecryptMeta(encrypted)
+		return decrypted, 3, err
 	default:
 		panic("unsupported version")
 	}

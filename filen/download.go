@@ -5,6 +5,7 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 	"hash"
 	"io"
@@ -20,7 +21,12 @@ func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, ch
 	if err != nil {
 		return nil, fmt.Errorf("downloading chunk %d: %w", chunkIndex, err)
 	}
-	decryptedBytes, err := file.EncryptionKey.DecryptData(encryptedBytes)
+	var decryptedBytes []byte
+	if file.AuthVersion == 1 {
+		decryptedBytes, err = crypto.V1Decrypt(encryptedBytes, file.EncryptionKey.Bytes[:])
+	} else {
+		decryptedBytes, err = file.EncryptionKey.DecryptData(encryptedBytes)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("decrypting chunk %d: %w", chunkIndex, err)
 	}
