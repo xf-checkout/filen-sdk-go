@@ -277,6 +277,11 @@ func (api *Filen) ListRecursive(ctx context.Context, dir types.DirectoryInterfac
 
 // TrashFile moves a file to trash.
 func (api *Filen) TrashFile(ctx context.Context, file types.File) error {
+	err := api.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer api.Unlock()
 	return api.Client.PostV3FileTrash(ctx, file.GetUUID())
 }
 
@@ -325,6 +330,11 @@ func (api *Filen) CreateDirectory(ctx context.Context, parent types.DirectoryInt
 
 // TrashDirectory moves a directory to trash.
 func (api *Filen) TrashDirectory(ctx context.Context, dir types.DirectoryInterface) error {
+	err := api.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer api.Unlock()
 	return api.Client.PostV3DirTrash(ctx, dir.GetUUID())
 }
 
@@ -387,6 +397,11 @@ func (api *Filen) moveDir(ctx context.Context, dir *types.Directory, newParentUU
 }
 
 func (api *Filen) MoveItem(ctx context.Context, item types.NonRootFileSystemObject, newParentUUID string, overwrite bool) error {
+	err := api.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer api.Unlock()
 	if dir, ok := item.(*types.Directory); ok {
 		return api.moveDir(ctx, dir, newParentUUID, overwrite)
 	} else if file, ok := item.(*types.File); ok {
@@ -473,6 +488,11 @@ func (api *Filen) updateDirMeta(ctx context.Context, dir *types.Directory, metaE
 }
 
 func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemObject) error {
+	err := api.Lock(ctx)
+	if err != nil {
+		return err
+	}
+	defer api.Unlock()
 	metaStr, err := item.GetMeta(api.AuthVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)

@@ -30,6 +30,8 @@ type Filen struct {
 
 	// BaseFolderUUID is the UUID of the cloud drive's root directory
 	BaseFolder types.RootDirectory
+
+	lock BackendLock
 }
 
 // New creates a new Filen and initializes it with the given email and password
@@ -181,6 +183,7 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		PublicKey:   *publicKey,
 		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
 		AuthVersion: info.AuthVersion,
+		lock:        NewBackendLock(),
 	}, nil
 }
 
@@ -227,6 +230,7 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
 		AuthVersion: info.AuthVersion,
 		HMACKey:     crypto.MakeHMACKey(privateKey),
+		lock:        NewBackendLock(),
 	}, nil
 }
 
