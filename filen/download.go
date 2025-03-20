@@ -30,48 +30,11 @@ const (
 	MaxBufferSize = 8
 )
 
-type CtxMutex struct {
-	channel chan struct{}
-}
-
-func NewCtxMutex() CtxMutex {
-	return CtxMutex{
-		channel: make(chan struct{}, 1),
-	}
-}
-
-func (m *CtxMutex) Lock(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return context.Cause(ctx)
-	case m.channel <- struct{}{}:
-		return nil
-	}
-}
-
-func (m *CtxMutex) MustLock() {
-	select {
-	case m.channel <- struct{}{}:
-		return
-	default:
-		panic("locking locked mutex")
-	}
-}
-
-func (m *CtxMutex) Unlock() {
-	select {
-	case <-m.channel:
-		return
-	default:
-		panic("unlocking unlocked mutex")
-	}
-}
-
 // chunkState represents the state of a single chunk in the buffer
 type chunkState struct {
 	data  [ChunkSize]byte // Fixed-size array for optimal cache locality
 	size  int             // Actual size of data (may be less than ChunkSize for the last chunk)
-	ctxMu CtxMutex        // Mutex for this specific chunk
+	ctxMu types.CtxMutex  // Mutex for this specific chunk
 }
 
 func (c *chunkState) copyTo(ctx context.Context, out []byte, offset int, maxLength int) (int, error) {
@@ -155,7 +118,7 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 
 	// Init and prefetch initial chunks
 	for i := 0; i < bufferSize; i++ {
-		reader.buffer[i].ctxMu = NewCtxMutex()
+		reader.buffer[i].ctxMu = types.NewCtxMutex()
 		reader.goFetchChunk(i + chunkIndex)
 	}
 	return reader

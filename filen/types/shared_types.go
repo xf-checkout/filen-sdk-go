@@ -1,6 +1,7 @@
 package types
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
@@ -225,4 +226,48 @@ func (root RootDirectory) GetParent() string {
 
 func (root RootDirectory) IsRoot() bool {
 	return true
+}
+
+type CtxMutex struct {
+	channel chan struct{}
+}
+
+func NewCtxMutex() CtxMutex {
+	return CtxMutex{
+		channel: make(chan struct{}, 1),
+	}
+}
+
+func (m *CtxMutex) Lock(ctx context.Context) error {
+	select {
+	case <-ctx.Done():
+		return context.Cause(ctx)
+	case m.channel <- struct{}{}:
+		return nil
+	}
+}
+
+func (m *CtxMutex) BlockUntilLock() {
+	select {
+	case m.channel <- struct{}{}:
+		return
+	}
+}
+
+func (m *CtxMutex) MustLock() {
+	select {
+	case m.channel <- struct{}{}:
+		return
+	default:
+		panic("locking locked mutex")
+	}
+}
+
+func (m *CtxMutex) Unlock() {
+	select {
+	case <-m.channel:
+		return
+	default:
+		panic("unlocking unlocked mutex")
+	}
 }
