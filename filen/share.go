@@ -50,20 +50,20 @@ func (api *Filen) addItemToDirectoryPublicLink(ctx context.Context, uuid, parent
 // This ensures that when an item is renamed or modified, the changes are visible
 // to all users and public links that have access to it.
 func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootFileSystemObject) error {
-	g, ctx := errgroup.WithContext(ctx)
+	g, gCtx := errgroup.WithContext(ctx)
 
 	var sharedResult *client.V3ItemSharedResponse
 	var linkedResult *client.V3ItemLinkedResponse
 
 	g.Go(func() error {
 		var err error
-		sharedResult, err = api.Client.PostV3ItemShared(ctx, item.GetUUID())
+		sharedResult, err = api.Client.PostV3ItemShared(gCtx, item.GetUUID())
 		return err
 	})
 
 	g.Go(func() error {
 		var err error
-		linkedResult, err = api.Client.PostV3ItemLinked(ctx, item.GetUUID())
+		linkedResult, err = api.Client.PostV3ItemLinked(gCtx, item.GetUUID())
 		return err
 	})
 
@@ -71,7 +71,7 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 		return fmt.Errorf("get shared or linked status: %w", err)
 	}
 
-	g, ctx = errgroup.WithContext(ctx)
+	g, gCtx = errgroup.WithContext(ctx)
 	g.SetLimit(MaxSmallCallers)
 	metaData, err := item.GetMeta(api.FileEncryptionVersion)
 	if err != nil {
@@ -83,7 +83,7 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 			if err != nil {
 				return fmt.Errorf("parse public key: %w", err)
 			}
-			return api.renameSharedItem(ctx, item, user.ID, metaData, *publicKey)
+			return api.renameSharedItem(gCtx, item, user.ID, metaData, *publicKey)
 		})
 	}
 	for _, link := range linkedResult.Links {
@@ -92,7 +92,7 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 			if err != nil {
 				return fmt.Errorf("make key: %w", err)
 			}
-			return api.renameLinkedItem(ctx, item, link.LinkUUID, key.EncryptMeta(metaData))
+			return api.renameLinkedItem(gCtx, item, link.LinkUUID, key.EncryptMeta(metaData))
 		})
 	}
 
@@ -264,7 +264,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 		return "", fmt.Errorf("list recursive: %w", err)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
@@ -272,7 +272,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 		if err != nil {
 			return fmt.Errorf("get meta: %w", err)
 		}
-		return api.Client.PostV3DirLinkAdd(ctx, client.V3DirLinkAddRequest{
+		return api.Client.PostV3DirLinkAdd(gCtx, client.V3DirLinkAddRequest{
 			UUID:       dir.GetUUID(),
 			ParentUUID: "base",
 			LinkUUID:   linkUUID,
@@ -289,7 +289,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
-			return api.Client.PostV3DirLinkAdd(ctx, client.V3DirLinkAddRequest{
+			return api.Client.PostV3DirLinkAdd(gCtx, client.V3DirLinkAddRequest{
 				UUID:       file.GetUUID(),
 				ParentUUID: file.GetParent(),
 				LinkUUID:   linkUUID,
@@ -306,7 +306,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
-			return api.Client.PostV3DirLinkAdd(ctx, client.V3DirLinkAddRequest{
+			return api.Client.PostV3DirLinkAdd(gCtx, client.V3DirLinkAddRequest{
 				UUID:       dir.GetUUID(),
 				ParentUUID: dir.GetParent(),
 				LinkUUID:   linkUUID,
@@ -380,21 +380,21 @@ func (api *Filen) shareDirToUser(ctx context.Context, dir *types.Directory, emai
 		return fmt.Errorf("list recursive: %w", err)
 	}
 
-	g, ctx := errgroup.WithContext(ctx)
+	g, gCtx := errgroup.WithContext(ctx)
 	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
-		return api.shareItemToUserNonRecursive(ctx, dir, email, key)
+		return api.shareItemToUserNonRecursive(gCtx, dir, email, key)
 	})
 
 	for _, file := range files {
 		g.Go(func() error {
-			return api.shareItemToUserNonRecursive(ctx, file, email, key)
+			return api.shareItemToUserNonRecursive(gCtx, file, email, key)
 		})
 	}
 	for _, dir := range dirs {
 		g.Go(func() error {
-			return api.shareItemToUserNonRecursive(ctx, dir, email, key)
+			return api.shareItemToUserNonRecursive(gCtx, dir, email, key)
 		})
 	}
 
