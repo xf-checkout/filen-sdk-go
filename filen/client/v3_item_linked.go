@@ -1,6 +1,9 @@
 package client
 
-import "context"
+import (
+	"context"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 // v3ItemLinkedRequest represents the request structure for checking item link status.
 type v3ItemLinkedRequest struct {
@@ -9,8 +12,8 @@ type v3ItemLinkedRequest struct {
 
 // V3ItemLinkedLink represents a public sharing link for an item (file or directory).
 type V3ItemLinkedLink struct {
-	LinkUUID string `json:"linkUUID"`
-	Key      string `json:"key"`
+	LinkUUID string                 `json:"linkUUID"`
+	Key      crypto.EncryptedString `json:"linkKey"`
 }
 
 // V3ItemLinkedResponse represents the response structure from the item linked endpoint.

@@ -88,7 +88,11 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 	}
 	for _, link := range linkedResult.Links {
 		g.Go(func() error {
-			key, err := api.GetMetaCrypterFromKeyString(link.Key, -1)
+			keyStr, err := api.DecryptMeta(link.Key)
+			if err != nil {
+				return fmt.Errorf("decrypt key: %w", err)
+			}
+			key, err := api.GetMetaCrypterFromKeyString(keyStr, -1)
 			if err != nil {
 				return fmt.Errorf("make key: %w", err)
 			}
