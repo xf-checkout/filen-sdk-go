@@ -884,7 +884,7 @@ func TestShareAndLink(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		file2, err := filen.UploadFile(context.Background(), iFile2, bytes.NewReader([]byte("Sample!")))
+		file2, err := filen.UploadFile(context.Background(), iFile2, bytes.NewReader(nil))
 		if err != nil {
 			t.Fatal(err)
 		}

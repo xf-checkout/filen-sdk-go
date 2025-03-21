@@ -220,30 +220,35 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 		}
 	}
 
+	var (
+		completeFile *types.File
+		err          error
+	)
 	if size == 0 {
-		return api.completeUploadEmpty(fileUpload)
-	}
-
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-	var completeFile *types.File
-	select {
-	case <-done:
+		completeFile, err = api.completeUploadEmpty(fileUpload)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		done := make(chan struct{})
+		go func() {
+			wg.Wait()
+			close(done)
+		}()
 		select {
-		case resp, ok := <-bucketAndRegion:
-			if !ok {
-				return nil, fmt.Errorf("no chunks successfully uploaded")
+		case <-done:
+			select {
+			case resp, ok := <-bucketAndRegion:
+				if !ok {
+					return nil, fmt.Errorf("no chunks successfully uploaded")
+				}
+				completeFile, err = api.completeUpload(fileUpload, resp.Bucket, resp.Region, size)
+				if err != nil {
+					return nil, fmt.Errorf("complete upload: %w", err)
+				}
+			case <-ctx.Done():
+				return nil, fmt.Errorf("context done %w", context.Cause(ctx))
 			}
-			var err error
-			completeFile, err = api.completeUpload(fileUpload, resp.Bucket, resp.Region, size)
-			if err != nil {
-				return nil, fmt.Errorf("complete upload: %w", err)
-			}
-		case <-ctx.Done():
-			return nil, fmt.Errorf("context done %w", context.Cause(ctx))
 		}
 	}
 
