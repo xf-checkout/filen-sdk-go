@@ -15,15 +15,17 @@ import (
 // the Filen SDK state. It contains only the essential data needed to reconstruct
 // a fully functional Filen object, focusing on cryptographic keys and identifiers.
 type serializableFilen struct {
-	APIKey         string     // API key for authentication
-	AuthVersion    int        // Authentication version (2 or 3)
-	Email          string     // User's email address
-	MasterKeys     [][64]byte // Master encryption keys
-	DEK            [32]byte   // Data Encryption Key (for auth v3)
-	KEK            [32]byte   // Key Encryption Key (for auth v3)
-	PrivateKey     []byte     // RSA private key in PKCS1 format
-	HMACKey        [32]byte   // Key used for HMAC operations
-	BaseFolderUUID string     // UUID of user's root directory
+	APIKey                    string             // API key for authentication
+	AuthVersion               crypto.AuthVersion // Authentication version (2 or 3)
+	FileEncryptionVersion     crypto.FileEncryptionVersion
+	MetadataEncryptionVersion crypto.MetadataEncryptionVersion
+	Email                     string     // User's email address
+	MasterKeys                [][64]byte // Master encryption keys
+	DEK                       [32]byte   // Data Encryption Key (for auth v3)
+	KEK                       [32]byte   // Key Encryption Key (for auth v3)
+	PrivateKey                []byte     // RSA private key in PKCS1 format
+	HMACKey                   [32]byte   // Key used for HMAC operations
+	BaseFolderUUID            string     // UUID of user's root directory
 }
 
 // serialize converts a Filen instance to a serializable format.
@@ -35,14 +37,16 @@ func (api *Filen) serialize() *serializableFilen {
 		masterKeys[i] = masterKey.Bytes
 	}
 	return &serializableFilen{
-		APIKey:         api.Client.APIKey,
-		AuthVersion:    api.AuthVersion,
-		Email:          api.Email,
-		MasterKeys:     masterKeys,
-		DEK:            api.DEK.Bytes,
-		PrivateKey:     x509.MarshalPKCS1PrivateKey(&api.PrivateKey),
-		HMACKey:        api.HMACKey,
-		BaseFolderUUID: api.BaseFolder.GetUUID(),
+		APIKey:                    api.Client.APIKey,
+		AuthVersion:               api.AuthVersion,
+		FileEncryptionVersion:     api.FileEncryptionVersion,
+		MetadataEncryptionVersion: api.MetadataEncryptionVersion,
+		Email:                     api.Email,
+		MasterKeys:                masterKeys,
+		DEK:                       api.DEK.Bytes,
+		PrivateKey:                x509.MarshalPKCS1PrivateKey(&api.PrivateKey),
+		HMACKey:                   api.HMACKey,
+		BaseFolderUUID:            api.BaseFolder.GetUUID(),
 	}
 }
 
@@ -153,14 +157,16 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
 		}
 		return &Filen{
-			Client:      client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
-			AuthVersion: tsconfig.AuthVersion,
-			Email:       tsconfig.Email,
-			MasterKeys:  masterKeys,
-			PrivateKey:  *privateKey,
-			PublicKey:   *publicKey,
-			HMACKey:     crypto.MakeHMACKey(privateKey),
-			BaseFolder:  types.NewRootDirectory(tsconfig.BaseFolderUUID),
+			Client:                    client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
+			AuthVersion:               crypto.AuthVersion(tsconfig.AuthVersion),
+			FileEncryptionVersion:     V2AccountFileEncryptionVersion,
+			MetadataEncryptionVersion: V2AccountMetadataEncryptionVersion,
+			Email:                     tsconfig.Email,
+			MasterKeys:                masterKeys,
+			PrivateKey:                *privateKey,
+			PublicKey:                 *publicKey,
+			HMACKey:                   crypto.MakeHMACKey(privateKey),
+			BaseFolder:                types.NewRootDirectory(tsconfig.BaseFolderUUID),
 		}, nil
 	case 3:
 		dek, err := crypto.MakeEncryptionKeyFromStr(tsconfig.MasterKeys[0])
@@ -172,15 +178,17 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
 		}
 		return &Filen{
-			Client:      client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
-			AuthVersion: tsconfig.AuthVersion,
-			Email:       tsconfig.Email,
-			MasterKeys:  make(crypto.MasterKeys, 0),
-			DEK:         *dek,
-			PrivateKey:  *private,
-			PublicKey:   *public,
-			HMACKey:     crypto.MakeHMACKey(private),
-			BaseFolder:  types.NewRootDirectory(tsconfig.BaseFolderUUID),
+			Client:                    client.NewWithAPIKey(context.Background(), tsconfig.APIKey),
+			AuthVersion:               crypto.AuthVersion(tsconfig.AuthVersion),
+			FileEncryptionVersion:     V2AccountFileEncryptionVersion,
+			MetadataEncryptionVersion: V2AccountMetadataEncryptionVersion,
+			Email:                     tsconfig.Email,
+			MasterKeys:                make(crypto.MasterKeys, 0),
+			DEK:                       *dek,
+			PrivateKey:                *private,
+			PublicKey:                 *public,
+			HMACKey:                   crypto.MakeHMACKey(private),
+			BaseFolder:                types.NewRootDirectory(tsconfig.BaseFolderUUID),
 		}, nil
 	default:
 		return nil, fmt.Errorf("invalid auth version: %d", tsconfig.AuthVersion)

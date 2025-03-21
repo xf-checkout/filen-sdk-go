@@ -23,13 +23,13 @@ type v3DirDownloadLinkedRequest struct {
 // It contains information needed to download files and navigate folders.
 type V3DirDownloadResponse struct {
 	Files []struct {
-		UUID     string                 `json:"uuid"`
-		Bucket   string                 `json:"bucket"`
-		Region   string                 `json:"region"`
-		Chunks   int                    `json:"chunks"`
-		Parent   string                 `json:"parent"`
-		Metadata crypto.EncryptedString `json:"metadata"`
-		Version  int                    `json:"version"`
+		UUID     string                       `json:"uuid"`
+		Bucket   string                       `json:"bucket"`
+		Region   string                       `json:"region"`
+		Chunks   int                          `json:"chunks"`
+		Parent   string                       `json:"parent"`
+		Metadata crypto.EncryptedString       `json:"metadata"`
+		Version  crypto.FileEncryptionVersion `json:"version"`
 
 		// optional
 		Name       string `json:"name"`

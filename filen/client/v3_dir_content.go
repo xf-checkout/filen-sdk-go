@@ -15,17 +15,17 @@ type v3dirContentRequest struct {
 // It contains lists of files and folders within the requested directory.
 type V3DirContentResponse struct {
 	Uploads []struct {
-		UUID      string                 `json:"uuid"`
-		Metadata  crypto.EncryptedString `json:"metadata"`
-		Rm        string                 `json:"rm"`
-		Timestamp int                    `json:"timestamp"`
-		Chunks    int                    `json:"chunks"`
-		Size      int                    `json:"size"`
-		Bucket    string                 `json:"bucket"`
-		Region    string                 `json:"region"`
-		Parent    string                 `json:"parent"`
-		Version   int                    `json:"version"`
-		Favorited int                    `json:"favorited"`
+		UUID      string                       `json:"uuid"`
+		Metadata  crypto.EncryptedString       `json:"metadata"`
+		Rm        string                       `json:"rm"`
+		Timestamp int                          `json:"timestamp"`
+		Chunks    int                          `json:"chunks"`
+		Size      int                          `json:"size"`
+		Bucket    string                       `json:"bucket"`
+		Region    string                       `json:"region"`
+		Parent    string                       `json:"parent"`
+		Version   crypto.FileEncryptionVersion `json:"version"`
+		Favorited int                          `json:"favorited"`
 	} `json:"uploads"`
 	Folders []struct {
 		UUID      string                 `json:"uuid"`

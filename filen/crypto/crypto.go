@@ -28,6 +28,10 @@ import (
 	"strings"
 )
 
+type AuthVersion int
+type FileEncryptionVersion int
+type MetadataEncryptionVersion int
+
 type MetaCrypter interface {
 	EncryptMeta(metadata string) EncryptedString
 	DecryptMeta(encrypted EncryptedString) (string, error)
@@ -256,21 +260,25 @@ type EncryptionKey struct {
 }
 
 // MakeNewFileKey returns a new encryption key
-func MakeNewFileKey(authVersion int) (*EncryptionKey, error) {
-	switch authVersion {
-	case 1, 2:
+func MakeNewFileKey(v FileEncryptionVersion) (*EncryptionKey, error) {
+	switch v {
+	case 1:
+		panic("unsupported version")
+	case 2:
 		encryptionKeyStr := GenerateRandomString(32)
 		encryptionKey, err := MakeEncryptionKeyFromBytes([32]byte([]byte(encryptionKeyStr)))
 		if err != nil {
 			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 2: %w", err)
 		}
 		return encryptionKey, nil
-	default:
+	case 3:
 		encryptionKey, err := NewEncryptionKey()
 		if err != nil {
 			return nil, fmt.Errorf("NewKeyEncryptionKey auth version 3: %w", err)
 		}
 		return encryptionKey, nil
+	default:
+		panic("unsupported version")
 	}
 }
 
@@ -391,8 +399,8 @@ func (key *EncryptionKey) DecryptData(data []byte) ([]byte, error) {
 	return data[12 : len(data)-key.Cipher.Overhead()], nil
 }
 
-func (key *EncryptionKey) ToStringWithAuthVersion(authVersion int) string {
-	if authVersion == 3 {
+func (key *EncryptionKey) ToStringWithVersion(v FileEncryptionVersion) string {
+	if v == 3 {
 		return hex.EncodeToString(key.Bytes[:])
 	}
 	return string(key.Bytes[:])

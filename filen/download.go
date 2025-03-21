@@ -22,7 +22,7 @@ func (api *Filen) fetchAndDecryptChunk(ctx context.Context, file *types.File, ch
 		return nil, fmt.Errorf("downloading chunk %d: %w", chunkIndex, err)
 	}
 	var decryptedBytes []byte
-	if file.AuthVersion == 1 {
+	if file.Version == 1 {
 		decryptedBytes, err = crypto.V1Decrypt(encryptedBytes, file.EncryptionKey.Bytes[:])
 	} else {
 		decryptedBytes, err = file.EncryptionKey.DecryptData(encryptedBytes)

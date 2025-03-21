@@ -96,7 +96,7 @@ func TestMain(m *testing.M) {
 func getCompatTestFile(parent types.DirectoryInterface) (*types.IncompleteFile, io.Reader, error) {
 	creationTime := time.Date(2025, time.January, 11, 12, 13, 14, 15*1000*1000, time.Local)
 	modificationTime := time.Date(2025, time.January, 11, 12, 13, 14, 16*1000*1000, time.Local)
-	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-20mb.txt", "", creationTime, modificationTime, parent)
+	incompleteFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "large_sample-20mb.txt", "", creationTime, modificationTime, parent)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -167,7 +167,7 @@ func TestUploadsToGoDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testEmptyFile, err := types.NewIncompleteFile(filen.AuthVersion, "empty.txt", "", time.Now(), time.Now(), goDir)
+	testEmptyFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "empty.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestUploadsToGoDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	testSmallFile, err := types.NewIncompleteFile(filen.AuthVersion, "small.txt", "", time.Now(), time.Now(), goDir)
+	testSmallFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "small.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -187,7 +187,7 @@ func TestUploadsToGoDir(t *testing.T) {
 
 	bigRandomBytes := make([]byte, 1024*1024*4)
 	_, _ = rand.Read(bigRandomBytes)
-	testBigFile, err := types.NewIncompleteFile(filen.AuthVersion, "big.txt", "", time.Now(), time.Now(), goDir)
+	testBigFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "big.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -209,7 +209,7 @@ func TestUploadsToGoDir(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		testNameSplitterFile, err := types.NewIncompleteFile(filen.AuthVersion, "nameSplitter.json", "", time.Now(), time.Now(), goDir)
+		testNameSplitterFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "nameSplitter.json", "", time.Now(), time.Now(), goDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -344,7 +344,7 @@ func TestReadDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		expectedDirs["uploads"] = uploads
-		incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), baseTestDir)
+		incompleteFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "large_sample-1mb.txt", "", time.Now(), time.Now(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -353,7 +353,7 @@ func TestReadDirectories(t *testing.T) {
 			t.Fatal(err)
 		}
 		expectedFiles["large_sample-1mb.txt"] = largeSample
-		incompleteFile, err = types.NewIncompleteFile(filen.AuthVersion, "abc.txt", "", time.Now(), time.Now(), baseTestDir)
+		incompleteFile, err = types.NewIncompleteFile(filen.FileEncryptionVersion, "abc.txt", "", time.Now(), time.Now(), baseTestDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -517,7 +517,7 @@ func TestSerialization(t *testing.T) {
 			APIKey:         filen.Client.APIKey,
 			PrivateKey:     privateKeyEncoded,
 			PublicKey:      publicKeyEncoded,
-			AuthVersion:    filen.AuthVersion,
+			AuthVersion:    int(filen.AuthVersion),
 			BaseFolderUUID: filen.BaseFolder.GetUUID(),
 		}
 
@@ -626,7 +626,7 @@ func TestEmptyFileActions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, baseTestDir)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.FileEncryptionVersion, osFile, baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -698,7 +698,7 @@ func TestFileActions(t *testing.T) {
 	fileName := "large_sample-20mb.txt"
 	osFile, err := os.Open("test_files/" + fileName)
 
-	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.AuthVersion, osFile, baseTestDir)
+	incompleteFile, err := types.NewIncompleteFileFromOSFile(filen.FileEncryptionVersion, osFile, baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -766,7 +766,7 @@ func TestFileActions(t *testing.T) {
 func TestPartialRead(t *testing.T) {
 	fileName := "partial_read.txt"
 
-	incompleteFile, err := types.NewIncompleteFile(filen.AuthVersion, fileName, "", time.Now(), time.Now(), baseTestDir)
+	incompleteFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, fileName, "", time.Now(), time.Now(), baseTestDir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -864,7 +864,7 @@ func TestShareAndLink(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		iFile1, err := types.NewIncompleteFile(filen.AuthVersion, "file1.txt", "", time.Now(), time.Now(), shareDir)
+		iFile1, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "file1.txt", "", time.Now(), time.Now(), shareDir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -880,7 +880,7 @@ func TestShareAndLink(t *testing.T) {
 		}
 		dirs = append(dirs, *dir1)
 
-		iFile2, err := types.NewIncompleteFile(filen.AuthVersion, "file2.txt", "", time.Now(), time.Now(), dir1)
+		iFile2, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "file2.txt", "", time.Now(), time.Now(), dir1)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -896,7 +896,7 @@ func TestShareAndLink(t *testing.T) {
 		}
 		dirs = append(dirs, *dir2)
 
-		iFile3, err := types.NewIncompleteFile(filen.AuthVersion, "file3.txt", "", time.Now(), time.Now(), dir2)
+		iFile3, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "file3.txt", "", time.Now(), time.Now(), dir2)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -954,7 +954,7 @@ func TestShareAndLink(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		addedIFile, err := types.NewIncompleteFile(filen.AuthVersion, "added.txt", "", time.Now(), time.Now(), addedDir)
+		addedIFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "added.txt", "", time.Now(), time.Now(), addedDir)
 		if err != nil {
 			t.Fatal(err)
 		}

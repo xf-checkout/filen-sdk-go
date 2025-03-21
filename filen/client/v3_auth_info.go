@@ -1,6 +1,9 @@
 package client
 
-import "context"
+import (
+	"context"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+)
 
 // v3authInfoRequest represents the request structure for the auth info endpoint.
 type v3authInfoRequest struct {
@@ -9,8 +12,8 @@ type v3authInfoRequest struct {
 
 // V3AuthInfoResponse represents the response structure from the auth info endpoint.
 type V3AuthInfoResponse struct {
-	AuthVersion int    `json:"authVersion"`
-	Salt        string `json:"salt"`
+	AuthVersion crypto.AuthVersion `json:"authVersion"`
+	Salt        string             `json:"salt"`
 }
 
 // PostV3AuthInfo calls /v3/auth/info to retrieve authentication information for a user.

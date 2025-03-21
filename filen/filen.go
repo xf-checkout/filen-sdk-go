@@ -18,7 +18,9 @@ type Filen struct {
 	Client *client.Client
 
 	// AuthVersion indicates which authentication scheme is being used (1, 2, or 3)
-	AuthVersion int
+	AuthVersion               crypto.AuthVersion
+	FileEncryptionVersion     crypto.FileEncryptionVersion
+	MetadataEncryptionVersion crypto.MetadataEncryptionVersion
 
 	// Email is the user's email address
 	Email string
@@ -222,15 +224,17 @@ func newV2Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 	}
 
 	return &Filen{
-		Client:      c,
-		Email:       email,
-		MasterKeys:  masterKeys,
-		PrivateKey:  *privateKey,
-		PublicKey:   *publicKey,
-		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
-		AuthVersion: info.AuthVersion,
-		HMACKey:     crypto.MakeHMACKey(privateKey),
-		lock:        NewBackendLock(),
+		Client:                    c,
+		Email:                     email,
+		MasterKeys:                masterKeys,
+		PrivateKey:                *privateKey,
+		PublicKey:                 *publicKey,
+		BaseFolder:                types.NewRootDirectory(baseFolderResponse.UUID),
+		AuthVersion:               info.AuthVersion,
+		FileEncryptionVersion:     V2AccountFileEncryptionVersion,
+		MetadataEncryptionVersion: V2AccountMetadataEncryptionVersion,
+		HMACKey:                   crypto.MakeHMACKey(privateKey),
+		lock:                      NewBackendLock(),
 	}, nil
 }
 
@@ -274,16 +278,18 @@ func newV3Authed(ctx context.Context, email string, info client.V3AuthInfoRespon
 		return nil, fmt.Errorf("failed to get base folder: %w", err)
 	}
 	return &Filen{
-		Client:      c,
-		Email:       email,
-		MasterKeys:  make(crypto.MasterKeys, 0),
-		DEK:         *dek,
-		PrivateKey:  *privateKey,
-		PublicKey:   *publicKey,
-		BaseFolder:  types.NewRootDirectory(baseFolderResponse.UUID),
-		AuthVersion: info.AuthVersion,
-		HMACKey:     crypto.MakeHMACKey(privateKey),
-		lock:        NewBackendLock(),
+		Client:                    c,
+		Email:                     email,
+		MasterKeys:                make(crypto.MasterKeys, 0),
+		DEK:                       *dek,
+		PrivateKey:                *privateKey,
+		PublicKey:                 *publicKey,
+		BaseFolder:                types.NewRootDirectory(baseFolderResponse.UUID),
+		AuthVersion:               info.AuthVersion,
+		FileEncryptionVersion:     3,
+		MetadataEncryptionVersion: 3,
+		HMACKey:                   crypto.MakeHMACKey(privateKey),
+		lock:                      NewBackendLock(),
 	}, nil
 }
 

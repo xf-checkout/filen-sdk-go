@@ -33,11 +33,11 @@ type IncompleteFile struct {
 // NewIncompleteFile creates a new incomplete file using the passed values.
 // If mimeType is empty, the function will attempt to determine it from the file extension.
 // Returns an error if the filename contains invalid characters.
-func NewIncompleteFile(authVersion int, name string, mimeType string, created time.Time, lastModified time.Time, parent DirectoryInterface) (*IncompleteFile, error) {
+func NewIncompleteFile(v crypto.FileEncryptionVersion, name string, mimeType string, created time.Time, lastModified time.Time, parent DirectoryInterface) (*IncompleteFile, error) {
 	if strings.ContainsRune(name, '/') {
 		return nil, fmt.Errorf("invalid file name")
 	}
-	key, err := crypto.MakeNewFileKey(authVersion)
+	key, err := crypto.MakeNewFileKey(v)
 	if err != nil {
 		return nil, fmt.Errorf("make new file key: %w", err)
 	}
@@ -63,21 +63,21 @@ func NewIncompleteFile(authVersion int, name string, mimeType string, created ti
 
 // NewIncompleteFileFromOSFile creates a new IncompleteFile from a local file system file.
 // It extracts metadata like creation time and modification time from the file.
-func NewIncompleteFileFromOSFile(authVersion int, osFile *os.File, parent DirectoryInterface) (*IncompleteFile, error) {
+func NewIncompleteFileFromOSFile(v crypto.FileEncryptionVersion, osFile *os.File, parent DirectoryInterface) (*IncompleteFile, error) {
 	fileStat, err := osFile.Stat()
 	if err != nil {
 		return nil, fmt.Errorf("stat file: %w", err)
 	}
 	created := io.GetCreationTime(fileStat)
-	return NewIncompleteFile(authVersion, filepath.Base(osFile.Name()), "", created, fileStat.ModTime(), parent)
+	return NewIncompleteFile(v, filepath.Base(osFile.Name()), "", created, fileStat.ModTime(), parent)
 }
 
 // NewFromBase creates a new incomplete file based on an existing one.
 // The new incomplete file will have a new UUID and encryption key,
 // but will retain all other properties from the original.
 // This is useful for retrying uploads or creating copies.
-func (file IncompleteFile) NewFromBase(authVersion int) (*IncompleteFile, error) {
-	key, err := crypto.MakeNewFileKey(authVersion)
+func (file IncompleteFile) NewFromBase(v crypto.FileEncryptionVersion) (*IncompleteFile, error) {
+	key, err := crypto.MakeNewFileKey(v)
 	if err != nil {
 		return nil, fmt.Errorf("make new file key: %w", err)
 	}
@@ -96,12 +96,12 @@ func (file IncompleteFile) NewFromBase(authVersion int) (*IncompleteFile, error)
 // GetRawMeta returns the file metadata without the size and hash fields,
 // since those cannot be calculated until the file is fully uploaded.
 // This provides a base FileMetadata structure that can be completed later.
-func (file IncompleteFile) GetRawMeta(authVersion int) FileMetadata {
+func (file IncompleteFile) GetRawMeta(v crypto.FileEncryptionVersion) FileMetadata {
 	return FileMetadata{
 		Name:         file.Name,
 		Size:         0,
 		MimeType:     file.MimeType,
-		Key:          file.EncryptionKey.ToStringWithAuthVersion(authVersion),
+		Key:          file.EncryptionKey.ToStringWithVersion(v),
 		LastModified: int(file.LastModified.UnixMilli()),
 		Created:      int(file.Created.UnixMilli()),
 		Hash:         "",
@@ -125,14 +125,14 @@ type FileMetadata struct {
 // It extends IncompleteFile with additional properties that are
 // only available once a file is fully uploaded.
 type File struct {
-	IncompleteFile        // Embedded IncompleteFile with base properties
-	Size           int    // The file size in bytes
-	Favorited      bool   // Whether the file is marked as a favorite
-	Region         string // The file's storage region
-	Bucket         string // The file's storage bucket
-	Chunks         int    // How many 1 MiB chunks the file is partitioned into
-	Hash           string // The file's SHA512 hash
-	AuthVersion    int    // The authentication version used to encrypt the file
+	IncompleteFile                              // Embedded IncompleteFile with base properties
+	Size           int                          // The file size in bytes
+	Favorited      bool                         // Whether the file is marked as a favorite
+	Region         string                       // The file's storage region
+	Bucket         string                       // The file's storage bucket
+	Chunks         int                          // How many 1 MiB chunks the file is partitioned into
+	Hash           string                       // The file's SHA512 hash
+	Version        crypto.FileEncryptionVersion // The crypto.FileEncryptionVersion version used to encrypt the file
 }
 
 // DirColor represents the color assigned to a directory in the Filen UI.
@@ -198,7 +198,7 @@ type NonRootFileSystemObject interface {
 
 	// GetMeta returns the metadata of the cloud item
 	// already marshalled into a JSON string
-	GetMeta(authVersion int) (string, error)
+	GetMeta(fileEncryptionVersion crypto.FileEncryptionVersion) (string, error)
 }
 
 // DirectoryInterface is an interface for directories.
@@ -227,8 +227,8 @@ func (file File) GetParent() string {
 
 // GetMeta implements NonRootFileSystemObject.GetMeta for File.
 // It returns the file's metadata as a JSON string, ready for encryption.
-func (file File) GetMeta(authVersion int) (string, error) {
-	meta := file.GetRawMeta(authVersion)
+func (file File) GetMeta(v crypto.FileEncryptionVersion) (string, error) {
+	meta := file.GetRawMeta(v)
 	meta.Size = file.Size
 	meta.Hash = file.Hash
 	metaStr, err := json.Marshal(meta)
@@ -261,7 +261,7 @@ func (dir Directory) IsRoot() bool {
 
 // GetMeta implements NonRootFileSystemObject.GetMeta for Directory.
 // It returns the directory's metadata as a JSON string, ready for encryption.
-func (dir Directory) GetMeta(authVersion int) (string, error) {
+func (dir Directory) GetMeta(v crypto.FileEncryptionVersion) (string, error) {
 	meta := DirectoryMetaData{
 		Name:     dir.Name,
 		Creation: int(dir.Created.Unix()),

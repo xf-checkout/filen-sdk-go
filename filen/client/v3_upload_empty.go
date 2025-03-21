@@ -8,14 +8,14 @@ import (
 
 // V3UploadEmptyRequest represents the request structure for creating an empty file.
 type V3UploadEmptyRequest struct {
-	UUID       string                 `json:"uuid"`
-	Name       crypto.EncryptedString `json:"name"`
-	NameHashed string                 `json:"nameHashed"`
-	Size       crypto.EncryptedString `json:"size"`
-	Parent     string                 `json:"parent"`
-	MimeType   crypto.EncryptedString `json:"mime"`
-	Metadata   crypto.EncryptedString `json:"metadata"`
-	Version    int                    `json:"version"`
+	UUID       string                       `json:"uuid"`
+	Name       crypto.EncryptedString       `json:"name"`
+	NameHashed string                       `json:"nameHashed"`
+	Size       crypto.EncryptedString       `json:"size"`
+	Parent     string                       `json:"parent"`
+	MimeType   crypto.EncryptedString       `json:"mime"`
+	Metadata   crypto.EncryptedString       `json:"metadata"`
+	Version    crypto.FileEncryptionVersion `json:"version"`
 }
 
 // PostV3UploadEmpty calls /v3/upload/empty to create an empty file.

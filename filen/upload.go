@@ -63,14 +63,14 @@ func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *fileUpload) *client.V3U
 		Parent:     fu.ParentUUID,
 		MimeType:   api.EncryptMeta(fu.MimeType),
 		//Metadata: must be filled by caller
-		Version: api.AuthVersion,
+		Version: api.FileEncryptionVersion,
 	}
 }
 
 // makeEmptyRequestFromUploader creates a complete upload request for an empty file.
 // It includes encrypted metadata and file hash information.
 func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
-	metadata := fu.GetRawMeta(api.AuthVersion)
+	metadata := fu.GetRawMeta(api.FileEncryptionVersion)
 	metadata.Size = 0
 	metadata.Hash = fileHash
 
@@ -87,7 +87,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) 
 // makeRequestFromUploader creates a complete upload request for a non-empty file.
 // It includes encrypted metadata, file size, chunk count, and hash information.
 func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
-	metadata := fu.GetRawMeta(api.AuthVersion)
+	metadata := fu.GetRawMeta(api.FileEncryptionVersion)
 	metadata.Size = size
 	metadata.Hash = fileHash
 
@@ -127,7 +127,7 @@ func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, s
 		Bucket:         bucket,
 		Chunks:         uploadRequest.Chunks,
 		Hash:           fileHash,
-		AuthVersion:    api.AuthVersion,
+		Version:        api.FileEncryptionVersion,
 	}, nil
 }
 

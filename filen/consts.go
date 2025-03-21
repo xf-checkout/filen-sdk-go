@@ -1,5 +1,7 @@
 package filen
 
+import "github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+
 const (
 	// ChunkSize is the maximum size of a chunk in bytes
 	// as defined by Filen when uploading files (1 MiB)
@@ -14,5 +16,7 @@ const (
 	MaxSmallCallers = 64
 	// MaxDownloadBufferSize is the number of chunks to keep in memory at once.
 	// This controls memory usage during downloads.
-	MaxDownloadBufferSize = 8
+	MaxDownloadBufferSize              = 8
+	V2AccountFileEncryptionVersion     = crypto.FileEncryptionVersion(2)
+	V2AccountMetadataEncryptionVersion = crypto.MetadataEncryptionVersion(2)
 )

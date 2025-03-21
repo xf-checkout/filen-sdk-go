@@ -21,9 +21,9 @@ func (api *Filen) HashFileName(name string) string {
 // EncryptMeta encrypts metadata, this is dependent on the auth version
 // version 1 is unimplemented, 2 uses the MasterKeys, and 3 uses the DEK
 func (api *Filen) EncryptMeta(metadata string) crypto.EncryptedString {
-	switch api.AuthVersion {
+	switch api.MetadataEncryptionVersion {
 	case 1:
-		panic("todo")
+		panic("unsupported version")
 	case 2:
 		return api.MasterKeys.EncryptMeta(metadata)
 	case 3:
@@ -34,19 +34,19 @@ func (api *Filen) EncryptMeta(metadata string) crypto.EncryptedString {
 }
 
 // DecryptMeta decrypts metadata, this reads the encrypted string to determine
-// the version, and then uses the MasterKeys or DEK
-func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, int, error) {
+// whether to use the MasterKeys or DEK
+func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, error) {
 	if encrypted[0:8] == "U2FsdGVk" {
 		decrypted, err := api.MasterKeys.DecryptMetaV1(encrypted)
-		return decrypted, 1, err
+		return decrypted, err
 	}
 	switch encrypted[0:3] {
 	case "002":
 		decrypted, err := api.MasterKeys.DecryptMetaV2(encrypted)
-		return decrypted, 2, err
+		return decrypted, err
 	case "003":
 		decrypted, err := api.DEK.DecryptMeta(encrypted)
-		return decrypted, 3, err
+		return decrypted, err
 	default:
 		panic("unsupported version")
 	}

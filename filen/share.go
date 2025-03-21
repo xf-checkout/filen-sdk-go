@@ -73,7 +73,7 @@ func (api *Filen) updateMaybeSharedItem(ctx context.Context, item types.NonRootF
 
 	g, ctx = errgroup.WithContext(ctx)
 	g.SetLimit(MaxSmallCallers)
-	metaData, err := item.GetMeta(api.AuthVersion)
+	metaData, err := item.GetMeta(api.FileEncryptionVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
 	}
@@ -145,7 +145,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 
 	dataToShare := make([]shareData, 0, 1)
 
-	meta, err := item.GetMeta(api.AuthVersion)
+	meta, err := item.GetMeta(api.FileEncryptionVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
 	}
@@ -163,7 +163,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 			return fmt.Errorf("list recursive: %w", err)
 		}
 		for _, file := range files {
-			meta, err := file.GetMeta(api.AuthVersion)
+			meta, err := file.GetMeta(api.FileEncryptionVersion)
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
@@ -175,7 +175,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 			})
 		}
 		for _, dir := range dirs {
-			meta, err := dir.GetMeta(api.AuthVersion)
+			meta, err := dir.GetMeta(api.FileEncryptionVersion)
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
@@ -217,7 +217,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 	}
 
 	for _, link := range linkedResult.Links {
-		keyStr, _, err := api.DecryptMeta(link.Key)
+		keyStr, err := api.DecryptMeta(link.Key)
 		if err != nil {
 			return fmt.Errorf("decrypt meta: %w", err)
 		}
@@ -268,7 +268,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
-		meta, err := dir.GetMeta(api.AuthVersion)
+		meta, err := dir.GetMeta(api.FileEncryptionVersion)
 		if err != nil {
 			return fmt.Errorf("get meta: %w", err)
 		}
@@ -285,7 +285,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 
 	for _, file := range files {
 		g.Go(func() error {
-			meta, err := file.GetMeta(api.AuthVersion)
+			meta, err := file.GetMeta(api.FileEncryptionVersion)
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
@@ -302,7 +302,7 @@ func (api *Filen) publicLinkDir(ctx context.Context, dir *types.Directory) (stri
 	}
 	for _, dir := range dirs {
 		g.Go(func() error {
-			meta, err := dir.GetMeta(api.AuthVersion)
+			meta, err := dir.GetMeta(api.FileEncryptionVersion)
 			if err != nil {
 				return fmt.Errorf("get meta: %w", err)
 			}
@@ -340,7 +340,7 @@ func (api *Filen) PublicLinkItem(ctx context.Context, item types.NonRootFileSyst
 // It encrypts the item's metadata with the recipient's public key to maintain end-to-end encryption.
 // This function does not share child items if the item is a directory.
 func (api *Filen) shareItemToUserNonRecursive(ctx context.Context, item types.NonRootFileSystemObject, email string, key *rsa.PublicKey) error {
-	metaStr, err := item.GetMeta(api.AuthVersion)
+	metaStr, err := item.GetMeta(api.FileEncryptionVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
 	}
