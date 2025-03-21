@@ -105,7 +105,7 @@ func (api *Filen) FindDirectoryOrCreate(ctx context.Context, path string) (types
 	var currentDir types.DirectoryInterface = &api.BaseFolder
 SegmentsLoop:
 	for _, segment := range segments {
-		if segment == "" {
+		if segment == "" || segment == "." {
 			continue
 		}
 
