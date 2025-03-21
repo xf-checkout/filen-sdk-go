@@ -61,7 +61,7 @@ func New(ctx context.Context, email, password, twoFactorCode string) (*Filen, er
 
 	switch authInfo.AuthVersion {
 	case 1:
-		panic("unimplemented")
+		return newV1(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	case 2:
 		return newV2(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	case 3:
@@ -84,7 +84,7 @@ func NewWithAPIKey(ctx context.Context, email, password, apiKey string) (*Filen,
 
 	switch authInfo.AuthVersion {
 	case 1:
-		panic("unimplemented")
+		return newV1WithAPIKey(ctx, email, password, *authInfo, c)
 	case 2:
 		return newV2WithAPIKey(ctx, email, password, *authInfo, c)
 	case 3:
@@ -150,6 +150,24 @@ func getDEK(ctx context.Context, kek crypto.EncryptionKey, c *client.Client) (*c
 		return nil, fmt.Errorf("failed to parse DEK: %w", err)
 	}
 	return dek, nil
+}
+
+// loginV1 performs version 1 authentication with the Filen API.
+// It derives the necessary keys from the password, then performs login
+// only used in a very limited number of accounts,
+// and here for backwards compatibility
+func loginV1(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*client.Client, *crypto.MasterKey, error) {
+	masterKey, derivedPass, err := crypto.V1DeriveMasterKeyAndDerivedPass(password)
+	if err != nil {
+		return nil, nil, fmt.Errorf("V1DeriveMasterKeyAndDerivedPass: %w", err)
+	}
+
+	response, err := uc.PostV3Login(ctx, email, derivedPass, info.AuthVersion, twoFactorCode)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to log in: %w", err)
+	}
+	c := uc.Authorize(response.APIKey)
+	return c, masterKey, nil
 }
 
 // loginV2 performs version 2 authentication with the Filen API.
@@ -289,4 +307,22 @@ func newV3WithAPIKey(ctx context.Context, email, password string, info client.V3
 	}
 
 	return newV3Authed(ctx, email, info, c, *kek)
+}
+
+func newV1(ctx context.Context, email, password, twoFactorCode string, info client.V3AuthInfoResponse, uc *client.UnauthorizedClient) (*Filen, error) {
+	c, masterKey, err := loginV1(ctx, email, password, twoFactorCode, info, uc)
+	if err != nil {
+		return nil, fmt.Errorf("loginV1: %w", err)
+	}
+
+	return newV2Authed(ctx, email, info, c, *masterKey)
+}
+
+func newV1WithAPIKey(ctx context.Context, email, password string, info client.V3AuthInfoResponse, c *client.Client) (*Filen, error) {
+	masterKey, _, err := crypto.V1DeriveMasterKeyAndDerivedPass(password)
+	if err != nil {
+		return nil, fmt.Errorf("V1DeriveMasterKeyAndDerivedPass: %w", err)
+	}
+
+	return newV2Authed(ctx, email, info, c, *masterKey)
 }

@@ -9,6 +9,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
@@ -18,8 +19,10 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/dromara/dongle/md2"
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/hkdf"
+	"golang.org/x/crypto/md4"
 	"golang.org/x/crypto/pbkdf2"
 	"slices"
 	"strings"
@@ -493,4 +496,42 @@ func PublicKeyFromString(pubKey string) (*rsa.PublicKey, error) {
 		return nil, fmt.Errorf("parsing public key, failed to cast: %v", err)
 	}
 	return publicKey, nil
+}
+
+// for backwards compatibility with V1 only
+func V1HashPassword(password string) DerivedPassword {
+	sha1Hasher := sha1.New()
+	sha256Hasher := sha256.New()
+	sha384Hasher := sha512.New384()
+	sha512Hasher := sha512.New()
+
+	md2Hasher := md2.New()
+	md4Hasher := md4.New()
+	md5Hasher := md5.New()
+	sha512Hasher2 := sha512.New()
+
+	sha1Hasher.Write([]byte(hex.EncodeToString([]byte(password))))
+	sha256Hasher.Write([]byte(hex.EncodeToString(sha1Hasher.Sum(nil))))
+	sha384Hasher.Write([]byte(hex.EncodeToString(sha256Hasher.Sum(nil))))
+	sha512Hasher.Write([]byte(hex.EncodeToString(sha384Hasher.Sum(nil))))
+	part1 := hex.EncodeToString(sha512Hasher.Sum(nil))
+
+	md2Hasher.Write([]byte(hex.EncodeToString([]byte(password))))
+	md4Hasher.Write([]byte(hex.EncodeToString(md2Hasher.Sum(nil))))
+	md5Hasher.Write([]byte(hex.EncodeToString(md4Hasher.Sum(nil))))
+	sha512Hasher2.Write([]byte(hex.EncodeToString(md5Hasher.Sum(nil))))
+	part2 := hex.EncodeToString(sha512Hasher2.Sum(nil))
+
+	return DerivedPassword(part1 + part2)
+}
+
+// for backwards compatibility with V1 only
+func V1DeriveMasterKeyAndDerivedPass(password string) (*MasterKey, DerivedPassword, error) {
+	pass := V1HashPassword(password)
+	masterKeyStr := V2Hash([]byte(pass))
+	masterKey, err := NewMasterKey([64]byte([]byte(masterKeyStr)))
+	if err != nil {
+		return nil, "", err
+	}
+	return masterKey, pass, nil
 }
