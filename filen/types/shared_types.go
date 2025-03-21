@@ -76,7 +76,7 @@ func NewIncompleteFileFromOSFile(v crypto.FileEncryptionVersion, osFile *os.File
 // The new incomplete file will have a new UUID and encryption key,
 // but will retain all other properties from the original.
 // This is useful for retrying uploads or creating copies.
-func (file IncompleteFile) NewFromBase(v crypto.FileEncryptionVersion) (*IncompleteFile, error) {
+func (file *IncompleteFile) NewFromBase(v crypto.FileEncryptionVersion) (*IncompleteFile, error) {
 	key, err := crypto.MakeNewFileKey(v)
 	if err != nil {
 		return nil, fmt.Errorf("make new file key: %w", err)
@@ -96,7 +96,7 @@ func (file IncompleteFile) NewFromBase(v crypto.FileEncryptionVersion) (*Incompl
 // GetRawMeta returns the file metadata without the size and hash fields,
 // since those cannot be calculated until the file is fully uploaded.
 // This provides a base FileMetadata structure that can be completed later.
-func (file IncompleteFile) GetRawMeta(v crypto.FileEncryptionVersion) FileMetadata {
+func (file *IncompleteFile) GetRawMeta(v crypto.FileEncryptionVersion) FileMetadata {
 	return FileMetadata{
 		Name:         file.Name,
 		Size:         0,
@@ -106,6 +106,15 @@ func (file IncompleteFile) GetRawMeta(v crypto.FileEncryptionVersion) FileMetada
 		Created:      int(file.Created.UnixMilli()),
 		Hash:         "",
 	}
+}
+
+func (file *IncompleteFile) SetMimeType(mimeType string) {
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	} else {
+		mimeType, _, _ = strings.Cut(mimeType, ";")
+	}
+	file.MimeType = mimeType
 }
 
 // FileMetadata contains the metadata of a file in the Filen cloud.
