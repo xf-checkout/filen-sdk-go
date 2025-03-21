@@ -2,6 +2,7 @@ package filen
 
 import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"strconv"
 	"strings"
 )
 
@@ -47,6 +48,29 @@ func (api *Filen) DecryptMeta(encrypted crypto.EncryptedString) (string, error) 
 	case "003":
 		decrypted, err := api.DEK.DecryptMeta(encrypted)
 		return decrypted, err
+	default:
+		panic("unsupported version")
+	}
+}
+
+func (api *Filen) GetMetaCrypterFromKeyString(keyStr string, v crypto.MetadataEncryptionVersion) (crypto.MetaCrypter, error) {
+	if v == -1 {
+		v = api.MetadataEncryptionVersion
+	}
+
+	if v == 3 {
+		_, err := strconv.ParseUint(keyStr, 16, 64)
+		if err != nil || len(keyStr) != 64 {
+			v = 2
+		}
+	}
+	switch v {
+	case 1:
+		panic("unsupported version")
+	case 2:
+		return crypto.NewMasterKey([]byte(keyStr))
+	case 3:
+		return crypto.MakeEncryptionKeyFromStr(keyStr)
 	default:
 		panic("unsupported version")
 	}

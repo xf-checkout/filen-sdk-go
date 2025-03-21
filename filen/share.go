@@ -221,7 +221,7 @@ func (api *Filen) updateItemWithMaybeSharedParent(ctx context.Context, item type
 		if err != nil {
 			return fmt.Errorf("decrypt meta: %w", err)
 		}
-		key, err := crypto.MakeEncryptionKeyFromUnknownStr(keyStr)
+		key, err := api.GetMetaCrypterFromKeyString(keyStr, -1)
 		if err != nil {
 			return fmt.Errorf("make key: %w", err)
 		}
