@@ -57,12 +57,16 @@ type MasterKeys []MasterKey
 func NewMasterKeys(encryptionKey MasterKey, stringKeys string) (MasterKeys, error) {
 	keys := make([]MasterKey, 0)
 	for _, key := range strings.Split(stringKeys, "|") {
-		if len(key) != 64 {
+		var mk *MasterKey
+		var err error
+		switch len(key) {
+		case 64:
+			mk, err = NewMasterKey([64]byte([]byte(key)))
+		case 40:
+			mk, err = NewV1MasterKey([40]byte([]byte(key)))
+		default:
 			return nil, fmt.Errorf("key length wrong %d", len(key))
 		}
-		keyBytes := []byte(key)
-		keySized := [64]byte(keyBytes)
-		mk, err := NewMasterKey(keySized)
 		if err != nil {
 			return nil, fmt.Errorf("NewMasterKey: %w", err)
 		}
@@ -102,15 +106,13 @@ func (ms *MasterKeys) DecryptMeta(encrypted EncryptedString) (string, error) {
 // MasterKey is a key used to encrypt and decrypt metadata
 // in the v1 and v2 encryption schemes
 type MasterKey struct {
-	Bytes        [64]byte
+	Bytes        []byte
 	DerivedBytes [32]byte
 	cipher       cipher.AEAD
 }
 
-// NewMasterKey creates a new MasterKey from a 64 byte key
-// usually this is a string of 64 characters
-func NewMasterKey(key [64]byte) (*MasterKey, error) {
-	derivedKey := pbkdf2.Key(key[:], key[:], 1, 32, sha512.New)
+func newMasterKey(key []byte) (*MasterKey, error) {
+	derivedKey := pbkdf2.Key(key, key, 1, 32, sha512.New)
 	derivedBytes := [32]byte{}
 	copy(derivedBytes[:], derivedKey[:32])
 	c, err := getCipherForKey(derivedBytes)
@@ -122,6 +124,16 @@ func NewMasterKey(key [64]byte) (*MasterKey, error) {
 		DerivedBytes: derivedBytes,
 		cipher:       c,
 	}, nil
+}
+
+// NewMasterKey creates a new MasterKey from a 64 byte key
+// usually this is a string of 64 characters
+func NewMasterKey(key [64]byte) (*MasterKey, error) {
+	return newMasterKey(key[:])
+}
+
+func NewV1MasterKey(key [40]byte) (*MasterKey, error) {
+	return newMasterKey(key[:])
 }
 
 // EncryptMeta should be avoided, and Filen.EncryptMeta should be used instead
@@ -536,7 +548,7 @@ func V1HashPassword(password string) DerivedPassword {
 // for backwards compatibility with V1 only
 func V1DeriveMasterKeyAndDerivedPass(password string) (*MasterKey, DerivedPassword, error) {
 	pass := V1HashPassword(password)
-	masterKeyStr := V2Hash([]byte(pass))
+	masterKeyStr := V2Hash([]byte(password))
 	masterKey, err := NewMasterKey([64]byte([]byte(masterKeyStr)))
 	if err != nil {
 		return nil, "", err

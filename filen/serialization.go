@@ -19,20 +19,20 @@ type serializableFilen struct {
 	AuthVersion               crypto.AuthVersion // Authentication version (2 or 3)
 	FileEncryptionVersion     crypto.FileEncryptionVersion
 	MetadataEncryptionVersion crypto.MetadataEncryptionVersion
-	Email                     string     // User's email address
-	MasterKeys                [][64]byte // Master encryption keys
-	DEK                       [32]byte   // Data Encryption Key (for auth v3)
-	KEK                       [32]byte   // Key Encryption Key (for auth v3)
-	PrivateKey                []byte     // RSA private key in PKCS1 format
-	HMACKey                   [32]byte   // Key used for HMAC operations
-	BaseFolderUUID            string     // UUID of user's root directory
+	Email                     string   // User's email address
+	MasterKeys                [][]byte // Master encryption keys
+	DEK                       [32]byte // Data Encryption Key (for auth v3)
+	KEK                       [32]byte // Key Encryption Key (for auth v3)
+	PrivateKey                []byte   // RSA private key in PKCS1 format
+	HMACKey                   [32]byte // Key used for HMAC operations
+	BaseFolderUUID            string   // UUID of user's root directory
 }
 
 // serialize converts a Filen instance to a serializable format.
 // It extracts all the necessary cryptographic keys and identifiers
 // needed to later reconstruct the Filen object.
 func (api *Filen) serialize() *serializableFilen {
-	masterKeys := make([][64]byte, len(api.MasterKeys))
+	masterKeys := make([][]byte, len(api.MasterKeys))
 	for i, masterKey := range api.MasterKeys {
 		masterKeys[i] = masterKey.Bytes
 	}
@@ -56,11 +56,20 @@ func (api *Filen) serialize() *serializableFilen {
 func (s *serializableFilen) deserialize() (*Filen, error) {
 	masterKeys := make([]crypto.MasterKey, len(s.MasterKeys))
 	for i, masterKey := range s.MasterKeys {
-		masterKey, err := crypto.NewMasterKey(masterKey)
+		var mk *crypto.MasterKey
+		var err error
+		switch len(masterKey) {
+		case 40:
+			mk, err = crypto.NewV1MasterKey([40]byte(masterKey))
+		case 64:
+			mk, err = crypto.NewMasterKey([64]byte(masterKey))
+		default:
+			return nil, fmt.Errorf("invalid master key length: %d", len(masterKey))
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse master key: %w", err)
 		}
-		masterKeys[i] = *masterKey
+		masterKeys[i] = *mk
 	}
 	var (
 		dek crypto.EncryptionKey
