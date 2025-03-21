@@ -574,7 +574,7 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 	}
 
 	g, gCtx := errgroup.WithContext(ctx)
-	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, item) })
+	g.Go(func() error { return api.updateMaybeSharedItem(gCtx, item) })
 	g.Go(func() error { return api.updateSearchHashes(gCtx, item) })
 	return g.Wait()
 }
