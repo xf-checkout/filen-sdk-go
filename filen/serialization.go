@@ -56,16 +56,7 @@ func (api *Filen) serialize() *serializableFilen {
 func (s *serializableFilen) deserialize() (*Filen, error) {
 	masterKeys := make([]crypto.MasterKey, len(s.MasterKeys))
 	for i, masterKey := range s.MasterKeys {
-		var mk *crypto.MasterKey
-		var err error
-		switch len(masterKey) {
-		case 40:
-			mk, err = crypto.NewV1MasterKey([40]byte(masterKey))
-		case 64:
-			mk, err = crypto.NewMasterKey([64]byte(masterKey))
-		default:
-			return nil, fmt.Errorf("invalid master key length: %d", len(masterKey))
-		}
+		mk, err := crypto.NewMasterKey(masterKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse master key: %w", err)
 		}
@@ -155,7 +146,7 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 			if len(masterKey) != 64 {
 				return nil, fmt.Errorf("invalid master key length: %d", len(masterKey))
 			}
-			masterKey, err := crypto.NewMasterKey([64]byte([]byte(masterKey)))
+			masterKey, err := crypto.NewMasterKey([]byte(masterKey))
 			if err != nil {
 				panic(err)
 			}

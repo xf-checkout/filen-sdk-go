@@ -57,16 +57,7 @@ type MasterKeys []MasterKey
 func NewMasterKeys(encryptionKey MasterKey, stringKeys string) (MasterKeys, error) {
 	keys := make([]MasterKey, 0)
 	for _, key := range strings.Split(stringKeys, "|") {
-		var mk *MasterKey
-		var err error
-		switch len(key) {
-		case 64:
-			mk, err = NewMasterKey([64]byte([]byte(key)))
-		case 40:
-			mk, err = NewV1MasterKey([40]byte([]byte(key)))
-		default:
-			return nil, fmt.Errorf("key length wrong %d", len(key))
-		}
+		mk, err := NewMasterKey([]byte(key))
 		if err != nil {
 			return nil, fmt.Errorf("NewMasterKey: %w", err)
 		}
@@ -111,7 +102,8 @@ type MasterKey struct {
 	cipher       cipher.AEAD
 }
 
-func newMasterKey(key []byte) (*MasterKey, error) {
+// NewMasterKey creates a new MasterKey from a byte slice
+func NewMasterKey(key []byte) (*MasterKey, error) {
 	derivedKey := pbkdf2.Key(key, key, 1, 32, sha512.New)
 	derivedBytes := [32]byte{}
 	copy(derivedBytes[:], derivedKey[:32])
@@ -124,16 +116,6 @@ func newMasterKey(key []byte) (*MasterKey, error) {
 		DerivedBytes: derivedBytes,
 		cipher:       c,
 	}, nil
-}
-
-// NewMasterKey creates a new MasterKey from a 64 byte key
-// usually this is a string of 64 characters
-func NewMasterKey(key [64]byte) (*MasterKey, error) {
-	return newMasterKey(key[:])
-}
-
-func NewV1MasterKey(key [40]byte) (*MasterKey, error) {
-	return newMasterKey(key[:])
 }
 
 // EncryptMeta should be avoided, and Filen.EncryptMeta should be used instead
@@ -255,7 +237,7 @@ func DeriveMKAndAuthFromPassword(password string, salt string) (*MasterKey, Deri
 	hasher.Write([]byte(derived[64:])) // write password
 	derivedPass := DerivedPassword(hex.EncodeToString(hasher.Sum(nil)))
 
-	masterKey, err := NewMasterKey(rawMasterKey)
+	masterKey, err := NewMasterKey(rawMasterKey[:])
 	if err != nil {
 		return nil, "", fmt.Errorf("NewMasterKey: %v\n", err)
 	}
@@ -549,7 +531,7 @@ func V1HashPassword(password string) DerivedPassword {
 func V1DeriveMasterKeyAndDerivedPass(password string) (*MasterKey, DerivedPassword, error) {
 	pass := V1HashPassword(password)
 	masterKeyStr := V2Hash([]byte(password))
-	masterKey, err := NewMasterKey([64]byte([]byte(masterKeyStr)))
+	masterKey, err := NewMasterKey([]byte(masterKeyStr))
 	if err != nil {
 		return nil, "", err
 	}
