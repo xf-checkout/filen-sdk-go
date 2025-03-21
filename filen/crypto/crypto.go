@@ -151,7 +151,7 @@ func (m *MasterKey) decryptMetaV1(metadata EncryptedString) (string, error) {
 	salt := decoded[8:16]
 	cipherText := decoded[16:]
 
-	keyBytes, ivBytes := deriveKeyAndIV(m.DerivedBytes[:], salt, 32, 16)
+	keyBytes, ivBytes := deriveKeyAndIV(m.Bytes[:], salt, 32, 16)
 
 	block, err := aes.NewCipher(keyBytes)
 	if err != nil {
