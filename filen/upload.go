@@ -170,7 +170,6 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 	defer cancel(nil) // Ensure context is canceled when we exit
 
 	fileUpload := api.newFileUpload(ctx, cancel, file)
-	uploadSem := make(chan struct{}, MaxUploaders)
 	wg := sync.WaitGroup{}
 	bucketAndRegion := make(chan client.V3UploadResponse, 1)
 	size := 0
@@ -194,11 +193,11 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 			select {
 			case <-ctx.Done():
 				return nil, fmt.Errorf("context done %w", context.Cause(ctx))
-			case uploadSem <- struct{}{}:
+			case api.UploadThreadSem <- struct{}{}:
 				wg.Add(1)
 				go func(i int, chunk []byte) {
 					defer func() {
-						<-uploadSem
+						<-api.UploadThreadSem
 						wg.Done()
 					}()
 

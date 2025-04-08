@@ -111,7 +111,7 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
-	bufferSize := min(MaxDownloadBufferSize, lastChunkIndex-chunkIndex+1)
+	bufferSize := min(api.MaxDownloadThreadsPerFile, lastChunkIndex-chunkIndex+1)
 
 	reader := &ChunkedReader{
 		file:              file,
@@ -145,6 +145,15 @@ func newChunkedReader(ctx context.Context, api *Filen, file *types.File) *Chunke
 // fetchChunk downloads and decrypts a specific chunk, storing it in the provided
 // chunkState. If an error occurs, it cancels the reader context with the error.
 func (r *ChunkedReader) fetchChunk(c *chunkState, chunkIndex int) {
+	select {
+	case <-r.ctx.Done():
+		return
+	case r.api.DownloadThreadSem <- struct{}{}:
+	}
+
+	defer func() {
+		<-r.api.DownloadThreadSem
+	}()
 	data, err := r.api.fetchAndDecryptChunk(r.ctx, r.file, chunkIndex)
 	if err != nil {
 		r.errOnce.Do(func() { r.cancel(fmt.Errorf("failed to fetch chunk %d: %w", chunkIndex, err)) })

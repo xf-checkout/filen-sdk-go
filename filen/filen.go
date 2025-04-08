@@ -45,6 +45,10 @@ type Filen struct {
 	// BaseFolder is the root directory of the user's cloud storage
 	BaseFolder types.RootDirectory
 
+	DownloadThreadSem         chan struct{}
+	UploadThreadSem           chan struct{}
+	MaxDownloadThreadsPerFile int
+
 	// lock provides synchronized access to backend resources
 	lock BackendLock
 }
@@ -61,16 +65,27 @@ func New(ctx context.Context, email, password, twoFactorCode string) (*Filen, er
 		return nil, err
 	}
 
+	var filen *Filen
+
 	switch authInfo.AuthVersion {
 	case 1:
-		return newV1(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
+		filen, err = newV1(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	case 2:
-		return newV2(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
+		filen, err = newV2(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	case 3:
-		return newV3(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
+		filen, err = newV3(ctx, email, password, twoFactorCode, *authInfo, unauthorizedClient)
 	default:
 		panic("unimplemented")
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	filen.DownloadThreadSem = make(chan struct{}, DefaultMaxDownloadThreads)
+	filen.UploadThreadSem = make(chan struct{}, DefaultMaxUploadThreads)
+	filen.MaxDownloadThreadsPerFile = DefaultMaxDownloadThreadsPerFile
+
+	return filen, nil
 }
 
 // NewWithAPIKey creates a new Filen instance using a pre-existing API key.
