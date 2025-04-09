@@ -572,6 +572,9 @@ func (api *Filen) UpdateMeta(ctx context.Context, item types.NonRootFileSystemOb
 	} else {
 		return fmt.Errorf("unknown item type")
 	}
+	if err != nil {
+		return fmt.Errorf("update meta: %w", err)
+	}
 
 	g, gCtx := errgroup.WithContext(ctx)
 	g.Go(func() error { return api.updateMaybeSharedItem(gCtx, item) })
