@@ -533,7 +533,7 @@ func TestSerialization(t *testing.T) {
 }
 
 func TestDirectoryActions(t *testing.T) {
-	newPath := "/abc/def/ghi"
+	newPath := "go/abc/def/ghi"
 	var directory *types.Directory
 	t.Run("GetBaseFolder", func(t *testing.T) {
 		dirOrRoot, err := filen.FindDirectory(context.Background(), "")
@@ -574,7 +574,7 @@ func TestDirectoryActions(t *testing.T) {
 		}
 	})
 	t.Run("Rename", func(t *testing.T) {
-		tempPath := "a/g/d"
+		tempPath := "go/abc/g/d"
 		tempDir, err := filen.FindDirectoryOrCreate(context.Background(), tempPath)
 		if err != nil {
 			t.Fatal(err)
@@ -587,7 +587,7 @@ func TestDirectoryActions(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		foundDir, err := filen.FindDirectoryOrCreate(context.Background(), "a/g/e")
+		foundDir, err := filen.FindDirectoryOrCreate(context.Background(), "go/abc/g/e")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -610,7 +610,7 @@ func TestDirectoryActions(t *testing.T) {
 		}
 	})
 	t.Run("Cleanup", func(t *testing.T) {
-		dir, err := filen.FindDirectory(context.Background(), "/abc")
+		dir, err := filen.FindDirectory(context.Background(), "go/abc")
 		if err != nil {
 			t.Fatal(err)
 		}
