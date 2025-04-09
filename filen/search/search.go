@@ -15,144 +15,25 @@ var wordSplitterRegex = regexp.MustCompile(`[\s\-_.;:,]+`)
 var cleanPrefixRegex = regexp.MustCompile(`[^a-z0-9]`)
 var numberRegex = regexp.MustCompile(`\d{3,}`)
 
-// NameSplitter splits an input string into a slice of chunks
-// to be hashed and then used for the global search
-func NameSplitter(input string) []string {
-
+func nameSplitter(input string, minLength int, maxLength int) []string {
 	normalized := strings.ToLower(strings.TrimSpace(input))
 	if normalized == "" {
 		return []string{}
 	}
-	length := len(normalized)
-
 	result := make(map[string]struct{})
 	result[normalized] = struct{}{}
+	maxLength = min(maxLength, len(normalized))
 
-	// Add non-accented version for better search
-	normalizedPlain := removeDiacritics(normalized)
-
-	if normalizedPlain != normalized {
-		result[normalizedPlain] = struct{}{}
-	}
-
-	if length < 3 {
-		return mapToSlice(result)
-	}
-
-	// Precompute frequently used values
-	cleanPrefix := cleanPrefixRegex.ReplaceAllString(normalized, "")
-	cleanLen := len(cleanPrefix)
-
-	// Prefix handling
-	if cleanLen >= 3 {
-		result[cleanPrefix[0:3]] = struct{}{}
-
-		if cleanLen >= 5 {
-			result[cleanPrefix[0:5]] = struct{}{}
-		}
-
-		if cleanLen >= 7 {
-			result[cleanPrefix[0:7]] = struct{}{}
-		}
-
-		if cleanLen >= 9 {
-			result[cleanPrefix[0:9]] = struct{}{}
+	for i := 0; i <= len(normalized); i++ {
+		for j := minLength; j <= maxLength && j+i <= len(normalized); j++ {
+			result[normalized[i:i+j]] = struct{}{}
 		}
 	}
-
-	// Number sequence extraction
-	numberMatches := numberRegex.FindAllString(cleanPrefix, -1)
-
-	for _, match := range numberMatches {
-		result[match] = struct{}{}
-	}
-
-	// Sliding window
-	var windowSizes []int
-	if length > 15 {
-		windowSizes = []int{4, 5}
-	} else {
-		windowSizes = []int{4}
-	}
-
-	for _, windowSize := range windowSizes {
-		stride := windowSize / 2
-
-		if length >= windowSize {
-			limit := length - windowSize
-
-			for i := 0; i <= limit; i += stride {
-				result[normalized[i:i+windowSize]] = struct{}{}
-			}
-		}
-	}
-
-	// Word processing
-	words := wordSplitterRegex.Split(normalized, -1)
-	var importantWords []string
-
-	for _, word := range words {
-		if word != "" && len(word) >= 2 {
-			importantWords = append(importantWords, word)
-			result[word] = struct{}{}
-
-			if len(word) > 8 {
-				result[word[0:4]] = struct{}{}
-				result[word[0:6]] = struct{}{}
-			}
-		}
-	}
-
-	// Word combinations
-	importantCount := len(importantWords)
-
-	if importantCount > 1 && importantCount <= 5 {
-		for i := 0; i < importantCount-1; i++ {
-			one := importantWords[i]
-			two := importantWords[i+1]
-
-			if one != "" && two != "" {
-				result[one+two] = struct{}{}
-			}
-		}
-		if importantCount >= 3 {
-			one := importantWords[0]
-			two := importantWords[importantCount-1]
-
-			if one != "" && two != "" {
-				result[one+two] = struct{}{}
-			}
-		}
-	}
-
-	// Suffix handling
-	result[normalized[length-3:]] = struct{}{}
-
-	if length >= 5 {
-		result[normalized[length-5:]] = struct{}{}
-	}
-
-	if length >= 7 {
-		result[normalized[length-7:]] = struct{}{}
-	}
-
-	// Extension handling
-	dotIndex := strings.LastIndex(normalized, ".")
-
-	if dotIndex > 0 && dotIndex < length-1 {
-		base := normalized[0:dotIndex]
-		ext := normalized[dotIndex+1:]
-
-		result["."+ext] = struct{}{}
-		result[ext] = struct{}{}
-
-		if dotIndex < 32 {
-			result[base] = struct{}{}
-		}
-	}
-
-	//
 	return processTokens(result)
+}
+
+func NameSplitter(input string) []string {
+	return nameSplitter(input, 2, 16)
 }
 
 var collator = collate.New(language.English)
@@ -161,9 +42,7 @@ func processTokens(result map[string]struct{}) []string {
 	// Convert map keys to slice
 	tokens := make([]string, 0, len(result))
 	for token := range result {
-		if len(token) >= 2 {
-			tokens = append(tokens, token)
-		}
+		tokens = append(tokens, token)
 	}
 
 	// Sort tokens by length, then lexicographically
@@ -178,8 +57,8 @@ func processTokens(result map[string]struct{}) []string {
 	})
 
 	// Slice to maximum 256 elements
-	if len(tokens) > 256 {
-		tokens = tokens[:256]
+	if len(tokens) > 4096 {
+		tokens = tokens[:4096]
 	}
 
 	return tokens
