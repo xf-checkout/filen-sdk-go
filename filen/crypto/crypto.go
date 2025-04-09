@@ -340,7 +340,11 @@ func (key *EncryptionKey) ToString() string {
 // DeriveKEKAndAuthFromPassword returns a KEK and a DerivedPassword
 // derived from the user password
 func DeriveKEKAndAuthFromPassword(password string, salt string) (*EncryptionKey, DerivedPassword, error) {
-	derived := hex.EncodeToString(argon2.IDKey([]byte(password), []byte(salt), 3, 65536, 4, 64))
+	bytes, err := hex.DecodeString(salt)
+	if err != nil {
+		return nil, "", fmt.Errorf("decoding salt: %v", err)
+	}
+	derived := hex.EncodeToString(argon2.IDKey([]byte(password), bytes, 3, 65536, 4, 64))
 
 	kek, err := MakeEncryptionKeyFromStr(derived[:len(derived)/2])
 	if err != nil {
