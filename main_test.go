@@ -70,10 +70,10 @@ func setupEnv() error {
 }
 
 func cleanupEnv() error {
-	//err := filen.TrashDirectory(context.Background(), baseTestDir)
-	//if err != nil {
-	//	return err
-	//}
+	err := filen.TrashDirectory(context.Background(), baseTestDir)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
