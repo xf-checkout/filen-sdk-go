@@ -36,9 +36,8 @@ func NameSplitter(input string) []string {
 	return nameSplitter(input, 2, 16)
 }
 
-var collator = collate.New(language.English)
-
 func processTokens(result map[string]struct{}) []string {
+	collator := collate.New(language.English)
 	// Convert map keys to slice
 	tokens := make([]string, 0, len(result))
 	for token := range result {
