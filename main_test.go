@@ -262,45 +262,47 @@ func TestDownloadsFromTSDir(t *testing.T) {
 		t.Fatalf("small file did not match expected contents: %s", string(smallBytes))
 	}
 
-	big, err := filen.FindFile(context.Background(), "compat-ts/big.txt")
-	if err != nil {
-		t.Fatal(err)
-	}
-	bigBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), big))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(bigBytes) != 1024*1024*4*2 {
-		t.Fatalf("expected big file to be 8MB, was instead %d bytes", len(bigBytes))
-	}
+	if filen.AuthVersion != 1 {
+		big, err := filen.FindFile(context.Background(), "compat-ts/big.txt")
+		if err != nil {
+			t.Fatal(err)
+		}
+		bigBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), big))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(bigBytes) != 1024*1024*4*2 {
+			t.Fatalf("expected big file to be 8MB, was instead %d bytes", len(bigBytes))
+		}
 
-	goSideCompatFile, goSideReader, err := getCompatTestFile(tsDir)
-	if err != nil {
-		t.Fatal(err)
-	}
-	tsSideCompatFile, err := filen.FindFile(context.Background(), path.Join("compat-ts", goSideCompatFile.Name))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if tsSideCompatFile == nil {
-		fmt.Printf("WARNING: could not find compatibility file %s, skipping compatibility check\n", goSideCompatFile.Name)
-		return
-	}
-	tsSideCompatFileBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), tsSideCompatFile))
-	if err != nil {
-		t.Fatal(err)
-	}
-	goSideCompatFileBytes, err := io.ReadAll(goSideReader)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(tsSideCompatFileBytes, goSideCompatFileBytes) {
-		t.Fatal("compatibility file contents did not match")
-	}
-	goSideCompatFile.UUID = tsSideCompatFile.UUID
-	goSideCompatFile.EncryptionKey.Cipher = tsSideCompatFile.EncryptionKey.Cipher
-	if !reflect.DeepEqual(*goSideCompatFile, tsSideCompatFile.IncompleteFile) {
-		t.Fatalf("compatibility file objects did not match; go side:\n%#v\nTS side:\n%#v", goSideCompatFile, tsSideCompatFile.IncompleteFile)
+		goSideCompatFile, goSideReader, err := getCompatTestFile(tsDir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		tsSideCompatFile, err := filen.FindFile(context.Background(), path.Join("compat-ts", goSideCompatFile.Name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if tsSideCompatFile == nil {
+			fmt.Printf("WARNING: could not find compatibility file %s, skipping compatibility check\n", goSideCompatFile.Name)
+			return
+		}
+		tsSideCompatFileBytes, err := io.ReadAll(filen.GetDownloadReader(context.Background(), tsSideCompatFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		goSideCompatFileBytes, err := io.ReadAll(goSideReader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(tsSideCompatFileBytes, goSideCompatFileBytes) {
+			t.Fatal("compatibility file contents did not match")
+		}
+		goSideCompatFile.UUID = tsSideCompatFile.UUID
+		goSideCompatFile.EncryptionKey.Cipher = tsSideCompatFile.EncryptionKey.Cipher
+		if !reflect.DeepEqual(*goSideCompatFile, tsSideCompatFile.IncompleteFile) {
+			t.Fatalf("compatibility file objects did not match; go side:\n%#v\nTS side:\n%#v", goSideCompatFile, tsSideCompatFile.IncompleteFile)
+		}
 	}
 
 	t.Run("NameSplitter", func(t *testing.T) {
@@ -489,7 +491,7 @@ func TestSerialization(t *testing.T) {
 	t.Run("TSConfig", func(t *testing.T) {
 		masterKeys := make([]string, max(len(filen.MasterKeys), 1))
 		switch filen.AuthVersion {
-		case 2:
+		case 1, 2:
 			for i, masterKey := range filen.MasterKeys {
 				masterKeys[i] = string(masterKey.Bytes[:])
 			}

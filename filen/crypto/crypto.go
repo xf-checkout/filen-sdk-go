@@ -516,13 +516,13 @@ func V1HashPassword(password string) DerivedPassword {
 	md5Hasher := md5.New()
 	sha512Hasher2 := sha512.New()
 
-	sha1Hasher.Write([]byte(hex.EncodeToString([]byte(password))))
+	sha1Hasher.Write([]byte(password))
 	sha256Hasher.Write([]byte(hex.EncodeToString(sha1Hasher.Sum(nil))))
 	sha384Hasher.Write([]byte(hex.EncodeToString(sha256Hasher.Sum(nil))))
 	sha512Hasher.Write([]byte(hex.EncodeToString(sha384Hasher.Sum(nil))))
 	part1 := hex.EncodeToString(sha512Hasher.Sum(nil))
 
-	md2Hasher.Write([]byte(hex.EncodeToString([]byte(password))))
+	md2Hasher.Write([]byte(password))
 	md4Hasher.Write([]byte(hex.EncodeToString(md2Hasher.Sum(nil))))
 	md5Hasher.Write([]byte(hex.EncodeToString(md4Hasher.Sum(nil))))
 	sha512Hasher2.Write([]byte(hex.EncodeToString(md5Hasher.Sum(nil))))

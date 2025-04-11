@@ -138,7 +138,7 @@ func getMasterKeys(ctx context.Context, masterKey crypto.MasterKey, c *client.Cl
 	if err != nil {
 		return nil, fmt.Errorf("failed to get master keys: %w", err)
 	}
-	masterKeysStr, err := masterKey.DecryptMetaV2(mkResponse.Keys)
+	masterKeysStr, err := masterKey.DecryptMeta(mkResponse.Keys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decrypt master keys meta: %w", err)
 	}

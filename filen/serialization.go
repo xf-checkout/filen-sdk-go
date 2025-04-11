@@ -140,12 +140,9 @@ type TSConfig struct {
 // the TypeScript and Go implementations.
 func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 	switch tsconfig.AuthVersion {
-	case 2:
+	case 1, 2:
 		masterKeys := make([]crypto.MasterKey, len(tsconfig.MasterKeys))
 		for i, masterKey := range tsconfig.MasterKeys {
-			if len(masterKey) != 64 {
-				return nil, fmt.Errorf("invalid master key length: %d", len(masterKey))
-			}
 			masterKey, err := crypto.NewMasterKey([]byte(masterKey))
 			if err != nil {
 				panic(err)
