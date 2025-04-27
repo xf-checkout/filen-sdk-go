@@ -446,7 +446,6 @@ func TestReadDirectories(t *testing.T) {
 
 		for _, file := range files {
 			if requiredFile, ok := requiredFiles[file.Name]; ok {
-				file.Hash = requiredFile.Hash // todo remove tmrw when hashing is fixed
 				if !reflect.DeepEqual(file, requiredFile) {
 					t.Fatalf("File %s does not match found:\n%#v\nExpected:\n%#v\n", file.Name, file, requiredFile)
 				}
