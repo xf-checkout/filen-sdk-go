@@ -39,7 +39,7 @@ func (c *Client) PostV3FileLinkEditEnable(ctx context.Context, file types.File) 
 		PasswordHashed: crypto.V2Hash([]byte("empty")),
 		DownloadBtn:    false,
 		Type:           "enable",
-		Salt:           hex.EncodeToString(crypto.GenerateRandomBytes(16)),
+		Salt:           hex.EncodeToString(crypto.GenerateRandomBytes(128)),
 	})
 	if err != nil {
 		return "", err
