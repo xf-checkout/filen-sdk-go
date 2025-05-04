@@ -13,6 +13,7 @@ import (
 	"mime"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -102,7 +103,7 @@ func (file *IncompleteFile) GetRawMeta(v crypto.FileEncryptionVersion) FileMetad
 		Size:         0,
 		MimeType:     file.MimeType,
 		Key:          file.EncryptionKey.ToStringWithVersion(v),
-		LastModified: int(file.LastModified.UnixMilli()),
+		LastModified: IntFromMaybeString(file.LastModified.UnixMilli()),
 		Created:      int(file.Created.UnixMilli()),
 		Hash:         "",
 	}
@@ -117,17 +118,41 @@ func (file *IncompleteFile) SetMimeType(mimeType string) {
 	file.MimeType = mimeType
 }
 
+type IntFromMaybeString int
+
+func (i *IntFromMaybeString) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" || string(data) == "" {
+		*i = 0 // Default value
+		return nil
+	}
+
+	var value int
+	if err := json.Unmarshal(data, &value); err != nil {
+		var stringValue string
+		if err := json.Unmarshal(data, &stringValue); err != nil {
+			return err
+		} else {
+			value, err = strconv.Atoi(stringValue)
+			if err != nil {
+				return fmt.Errorf("couldn't unmarshal IntFromMaybeString: %w", err)
+			}
+		}
+	}
+	*i = IntFromMaybeString(value)
+	return nil
+}
+
 // FileMetadata contains the metadata of a file in the Filen cloud.
 // This structure is encrypted before being uploaded to the server
 // to ensure end-to-end encryption of file details.
 type FileMetadata struct {
-	Name         string `json:"name"`         // The file name
-	Size         int    `json:"size"`         // The file size in bytes
-	MimeType     string `json:"mime"`         // The MIME type
-	Key          string `json:"key"`          // The encryption key as a string
-	LastModified int    `json:"lastModified"` // Last modification timestamp in milliseconds
-	Created      int    `json:"creation"`     // Creation timestamp in milliseconds
-	Hash         string `json:"hash"`         // The file's SHA512 hash
+	Name         string             `json:"name"`         // The file name
+	Size         int                `json:"size"`         // The file size in bytes
+	MimeType     string             `json:"mime"`         // The MIME type
+	Key          string             `json:"key"`          // The encryption key as a string
+	LastModified IntFromMaybeString `json:"lastModified"` // Last modification timestamp in milliseconds
+	Created      int                `json:"creation"`     // Creation timestamp in milliseconds
+	Hash         string             `json:"hash"`         // The file's SHA512 hash
 }
 
 // File represents a complete file in the Filen cloud storage.
