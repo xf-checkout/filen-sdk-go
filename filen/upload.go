@@ -208,20 +208,24 @@ func (api *Filen) uploadFileChunks(ctx context.Context, fu *fileUpload, bucketAn
 	size := 0
 	for i := 0; ; i++ {
 		data := make([]byte, ChunkSize, ChunkSize+file.EncryptionKey.Cipher.Overhead())
-		read, err := r.Read(data)
-		size += read
-
-		if err != nil && err != io.EOF {
-			fu.cancel(fmt.Errorf("read chunk %d: %w", i, err))
-			return 0, err
+		lastChunk := false
+		for j := 0; j < ChunkSize; {
+			read, err := r.Read(data[j:])
+			if err != nil && err != io.EOF {
+				fu.cancel(fmt.Errorf("read chunk %d: %w", i, err))
+				return 0, err
+			}
+			j += read
+			size += read
+			if err == io.EOF {
+				data = data[:j]
+				lastChunk = true
+				break
+			}
 		}
 
-		if read > 0 {
-			if read < ChunkSize {
-				data = data[:read]
-			}
+		if len(data) > 0 {
 			fu.hasher.Write(data)
-
 			select {
 			case <-ctx.Done():
 				return 0, fmt.Errorf("context done %w", context.Cause(ctx))
@@ -230,7 +234,7 @@ func (api *Filen) uploadFileChunks(ctx context.Context, fu *fileUpload, bucketAn
 			}
 		}
 
-		if err == io.EOF {
+		if lastChunk {
 			break
 		}
 	}
