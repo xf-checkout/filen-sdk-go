@@ -10,7 +10,6 @@ import (
 	"hash"
 	"io"
 	"strconv"
-	"sync"
 
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
@@ -23,18 +22,16 @@ import (
 type fileUpload struct {
 	types.IncompleteFile        // The file being uploaded
 	uploadKey            string // Random key for this upload session
-	ctx                  context.Context
 	cancel               context.CancelCauseFunc
 	hasher               hash.Hash // For calculating file hash during upload
 }
 
 // newFileUpload creates a new fileUpload structure from an IncompleteFile.
 // It initializes a new random upload key and hash calculator for the upload process.
-func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseFunc, file *types.IncompleteFile) *fileUpload {
+func (api *Filen) newFileUpload(cancel context.CancelCauseFunc, file *types.IncompleteFile) *fileUpload {
 	return &fileUpload{
 		IncompleteFile: *file,
 		uploadKey:      crypto.GenerateRandomString(32),
-		ctx:            ctx,
 		cancel:         cancel,
 		hasher:         sha512.New(),
 	}
@@ -43,9 +40,9 @@ func (api *Filen) newFileUpload(ctx context.Context, cancel context.CancelCauseF
 // uploadChunk encrypts and uploads a single chunk of a file.
 // This function handles the encryption of the chunk before sending it to the server.
 // It returns storage details (bucket and region) for the uploaded chunk.
-func (api *Filen) uploadChunk(fu *fileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
+func (api *Filen) uploadChunk(ctx context.Context, fu *fileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
-	response, err := api.Client.PostV3Upload(fu.ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
+	response, err := api.Client.PostV3Upload(ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
 	if err != nil {
 		return nil, fmt.Errorf("upload chunk %d: %w", chunkIndex, err)
 	}
@@ -109,13 +106,13 @@ func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash str
 
 // completeUpload finalizes the upload of a non-empty file.
 // It sends the final metadata to the server and constructs the completed File object.
-func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, size int) (*types.File, error) {
+func (api *Filen) completeUpload(ctx context.Context, fu *fileUpload, bucket string, region string, size int) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
-	_, err = api.Client.PostV3UploadDone(fu.ctx, *uploadRequest)
+	_, err = api.Client.PostV3UploadDone(ctx, *uploadRequest)
 	if err != nil {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}
@@ -133,13 +130,13 @@ func (api *Filen) completeUpload(fu *fileUpload, bucket string, region string, s
 
 // completeUploadEmpty finalizes the upload of an empty (zero-byte) file.
 // It sends the appropriate metadata to the server and constructs the completed File object.
-func (api *Filen) completeUploadEmpty(fu *fileUpload) (*types.File, error) {
+func (api *Filen) completeUploadEmpty(ctx context.Context, fu *fileUpload) (*types.File, error) {
 	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
 	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
 	}
-	_, err = api.Client.PostV3UploadEmpty(fu.ctx, *uploadRequest)
+	_, err = api.Client.PostV3UploadEmpty(ctx, *uploadRequest)
 	if err != nil {
 		return nil, fmt.Errorf("complete upload: %w", err)
 	}
@@ -167,50 +164,69 @@ func (api *Filen) completeUploadEmpty(fu *fileUpload) (*types.File, error) {
 // - Updating search indexes and shared parent metadata
 func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
 	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(nil) // Ensure context is canceled when we exit
-
-	fileUpload := api.newFileUpload(ctx, cancel, file)
-	wg := sync.WaitGroup{}
+	fu := api.newFileUpload(cancel, file)
 	bucketAndRegion := make(chan client.V3UploadResponse, 1)
-	size := 0
 
+	size, err := api.uploadFileChunks(ctx, fu, bucketAndRegion, file, r)
+	if err != nil {
+		return nil, err
+	}
+
+	completeFile, err := api.completeFileUpload(ctx, fu, bucketAndRegion, size)
+	if err != nil {
+		return nil, err
+	}
+
+	g, gCtx := errgroup.WithContext(ctx)
+	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, completeFile) })
+	g.Go(func() error { return api.updateSearchHashes(gCtx, completeFile) })
+	if err := g.Wait(); err != nil {
+		return nil, err
+	}
+	return completeFile, nil
+}
+
+func (api *Filen) makeChunkUploadFunc(gCtx context.Context, bucketAndRegion chan client.V3UploadResponse, fu *fileUpload, chunkIndex int, data []byte) func() error {
+	return func() error {
+		defer func() {
+			<-api.UploadThreadSem
+		}()
+		resp, err := api.uploadChunk(gCtx, fu, chunkIndex, data)
+		if err != nil {
+			return err
+		}
+		select { // only care about getting this once
+		case bucketAndRegion <- *resp:
+		default:
+		}
+		return nil
+	}
+}
+
+func (api *Filen) uploadFileChunks(ctx context.Context, fu *fileUpload, bucketAndRegion chan client.V3UploadResponse, file *types.IncompleteFile, r io.Reader) (int, error) {
+	g, gCtx := errgroup.WithContext(ctx)
+	size := 0
 	for i := 0; ; i++ {
 		data := make([]byte, ChunkSize, ChunkSize+file.EncryptionKey.Cipher.Overhead())
 		read, err := r.Read(data)
 		size += read
 
 		if err != nil && err != io.EOF {
-			fileUpload.cancel(fmt.Errorf("read chunk %d: %w", i, err))
-			return nil, err
+			fu.cancel(fmt.Errorf("read chunk %d: %w", i, err))
+			return 0, err
 		}
 
 		if read > 0 {
 			if read < ChunkSize {
 				data = data[:read]
 			}
-			fileUpload.hasher.Write(data)
+			fu.hasher.Write(data)
 
 			select {
 			case <-ctx.Done():
-				return nil, fmt.Errorf("context done %w", context.Cause(ctx))
+				return 0, fmt.Errorf("context done %w", context.Cause(ctx))
 			case api.UploadThreadSem <- struct{}{}:
-				wg.Add(1)
-				go func(i int, chunk []byte) {
-					defer func() {
-						<-api.UploadThreadSem
-						wg.Done()
-					}()
-
-					resp, err := api.uploadChunk(fileUpload, i, data)
-					if err != nil {
-						cancel(err)
-						return
-					}
-					select { // only care about getting this once
-					case bucketAndRegion <- *resp:
-					default:
-					}
-				}(i, data)
+				g.Go(api.makeChunkUploadFunc(gCtx, bucketAndRegion, fu, i, data))
 			}
 		}
 
@@ -219,43 +235,35 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 		}
 	}
 
+	if err := g.Wait(); err != nil {
+		return 0, err
+	}
+	return size, nil
+}
+
+func (api *Filen) completeFileUpload(ctx context.Context, fu *fileUpload, bucketAndRegion chan client.V3UploadResponse, size int) (*types.File, error) {
 	var (
 		completeFile *types.File
 		err          error
 	)
 	if size == 0 {
-		completeFile, err = api.completeUploadEmpty(fileUpload)
+		completeFile, err = api.completeUploadEmpty(ctx, fu)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		done := make(chan struct{})
-		go func() {
-			wg.Wait()
-			close(done)
-		}()
 		select {
-		case <-done:
-			select {
-			case resp, ok := <-bucketAndRegion:
-				if !ok {
-					return nil, fmt.Errorf("no chunks successfully uploaded")
-				}
-				completeFile, err = api.completeUpload(fileUpload, resp.Bucket, resp.Region, size)
-				if err != nil {
-					return nil, fmt.Errorf("complete upload: %w", err)
-				}
-			case <-ctx.Done():
-				return nil, fmt.Errorf("context done %w", context.Cause(ctx))
+		case resp, ok := <-bucketAndRegion:
+			if !ok {
+				return nil, fmt.Errorf("no chunks successfully uploaded")
 			}
+			completeFile, err = api.completeUpload(ctx, fu, resp.Bucket, resp.Region, size)
+			if err != nil {
+				return nil, fmt.Errorf("complete upload: %w", err)
+			}
+		case <-ctx.Done():
+			return nil, fmt.Errorf("context done %w", context.Cause(ctx))
 		}
-	}
-
-	g, gCtx := errgroup.WithContext(ctx)
-	g.Go(func() error { return api.updateItemWithMaybeSharedParent(gCtx, completeFile) })
-	g.Go(func() error { return api.updateSearchHashes(gCtx, completeFile) })
-	if err := g.Wait(); err != nil {
-		return nil, err
 	}
 	return completeFile, nil
 }
