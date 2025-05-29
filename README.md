@@ -114,4 +114,4 @@ if err != nil {
 
 ## License
 
-Distributed under the AGPL-3.0 License. See [LICENSE](https://github.com/FilenCloudDienste/filen-sdk-go/blob/main/LICENSE.md) for more information.
+Distributed under the MIT license. See [LICENSE](https://github.com/FilenCloudDienste/filen-sdk-go/blob/main/LICENSE.md) for more information.
