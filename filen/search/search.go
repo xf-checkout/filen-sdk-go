@@ -5,28 +5,23 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
-	"regexp"
 	"sort"
 	"strings"
-	"unicode"
 )
-
-var wordSplitterRegex = regexp.MustCompile(`[\s\-_.;:,]+`)
-var cleanPrefixRegex = regexp.MustCompile(`[^a-z0-9]`)
-var numberRegex = regexp.MustCompile(`\d{3,}`)
 
 func nameSplitter(input string, minLength int, maxLength int) []string {
 	normalized := strings.ToLower(strings.TrimSpace(input))
 	if normalized == "" {
 		return []string{}
 	}
+	runed := []rune(normalized)
 	result := make(map[string]struct{})
-	result[normalized] = struct{}{}
-	maxLength = min(maxLength, len(normalized))
+	result[string(runed)] = struct{}{}
+	maxLength = min(maxLength, len(runed))
 
-	for i := 0; i <= len(normalized); i++ {
-		for j := minLength; j <= maxLength && j+i <= len(normalized); j++ {
-			result[normalized[i:i+j]] = struct{}{}
+	for i := 0; i <= len(runed); i++ {
+		for j := minLength; j <= maxLength && j+i <= len(runed); j++ {
+			result[string(runed[i:i+j])] = struct{}{}
 		}
 	}
 	return processTokens(result)
@@ -61,28 +56,6 @@ func processTokens(result map[string]struct{}) []string {
 	}
 
 	return tokens
-}
-
-// Helper function to convert map keys to slice
-func mapToSlice(m map[string]struct{}) []string {
-	result := make([]string, 0, len(m))
-	for key := range m {
-		result = append(result, key)
-	}
-	return result
-}
-
-// Helper function to remove diacritics (equivalent to normalize("NFD") and removing combining marks)
-func removeDiacritics(s string) string {
-	result := make([]rune, 0, len(s))
-	for _, r := range s {
-		if unicode.Is(unicode.Mn, r) {
-			// Skip combining marks
-			continue
-		}
-		result = append(result, r)
-	}
-	return string(result)
 }
 
 func generateSearchIndexHashes(input string, key crypto.HMACKey) []string {

@@ -119,6 +119,8 @@ type nameSplitterTestFile struct {
 	Split2 []string `json:"split2"`
 	Name3  string   `json:"name3"`
 	Split3 []string `json:"split3"`
+	Name4  string   `json:"name4"`
+	Split4 []string `json:"split4"`
 }
 
 func makeNameSplitterTestFile() nameSplitterTestFile {
@@ -129,6 +131,8 @@ func makeNameSplitterTestFile() nameSplitterTestFile {
 		Split2: search.NameSplitter("Screenshot 2023-05-16 201840.png"),
 		Name3:  "!service-invoice-657c56116e4f6947a80001cc.pdf",
 		Split3: search.NameSplitter("!service-invoice-657c56116e4f6947a80001cc.pdf"),
+		Name4:  "файл.txt",
+		Split4: search.NameSplitter("файл.txt"),
 	}
 }
 
