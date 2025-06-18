@@ -94,8 +94,8 @@ func TestMain(m *testing.M) {
 }
 
 func getCompatTestFile(parent types.DirectoryInterface) (*types.IncompleteFile, io.Reader, error) {
-	creationTime := time.Date(2025, time.January, 11, 12, 13, 14, 15*1000*1000, time.Local)
-	modificationTime := time.Date(2025, time.January, 11, 12, 13, 14, 16*1000*1000, time.Local)
+	creationTime := time.Date(2025, time.January, 11, 12, 13, 14, 15*1000*1000, time.UTC).Local()
+	modificationTime := time.Date(2025, time.January, 11, 12, 13, 14, 16*1000*1000, time.UTC).Local()
 	incompleteFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "large_sample-20mb.txt", "", creationTime, modificationTime, parent)
 	if err != nil {
 		return nil, nil, err
