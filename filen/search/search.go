@@ -32,7 +32,6 @@ func NameSplitter(input string) []string {
 }
 
 func processTokens(result map[string]struct{}) []string {
-	collator := collate.New(language.English)
 	// Convert map keys to slice
 	tokens := make([]string, 0, len(result))
 	for token := range result {
@@ -40,15 +39,7 @@ func processTokens(result map[string]struct{}) []string {
 	}
 
 	// Sort tokens by length, then lexicographically
-	sort.SliceStable(tokens, func(i, j int) bool {
-		lengthDiff := len(tokens[i]) - len(tokens[j])
-
-		if lengthDiff != 0 {
-			return lengthDiff < 0 // For ascending order by length
-		}
-
-		return collator.CompareString(tokens[i], tokens[j]) < 0
-	})
+	SortTokens(tokens)
 
 	// Slice to maximum 256 elements
 	if len(tokens) > 4096 {
@@ -56,6 +47,13 @@ func processTokens(result map[string]struct{}) []string {
 	}
 
 	return tokens
+}
+
+func SortTokens(tokens []string) {
+	collator := collate.New(language.English)
+	sort.SliceStable(tokens, func(i, j int) bool {
+		return collator.CompareString(tokens[i], tokens[j]) < 0
+	})
 }
 
 func generateSearchIndexHashes(input string, key crypto.HMACKey) []string {

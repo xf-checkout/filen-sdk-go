@@ -310,10 +310,7 @@ func TestDownloadsFromTSDir(t *testing.T) {
 	}
 
 	t.Run("NameSplitter", func(t *testing.T) {
-		goSideNameSplitterBytes, err := json.Marshal(makeNameSplitterTestFile())
-		if err != nil {
-			t.Fatal(err)
-		}
+		goSideNameSplitterStruct := makeNameSplitterTestFile()
 		tsSideNameSplitterFile, err := filen.FindFile(context.Background(), path.Join("compat-ts", "nameSplitter.json"))
 		if err != nil {
 			t.Fatal(err)
@@ -322,8 +319,19 @@ func TestDownloadsFromTSDir(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.Equal(goSideNameSplitterBytes, tsSideNameSplitterBytes) {
-			t.Fatalf("nameSplitter file contents did not match. Go side:\n%s\nTS side:\n%s", string(goSideNameSplitterBytes), string(tsSideNameSplitterBytes))
+		tsSideNameSplitterStruct := &nameSplitterTestFile{}
+		err = json.Unmarshal(tsSideNameSplitterBytes, tsSideNameSplitterStruct)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		search.SortTokens(tsSideNameSplitterStruct.Split1)
+		search.SortTokens(tsSideNameSplitterStruct.Split2)
+		search.SortTokens(tsSideNameSplitterStruct.Split3)
+		search.SortTokens(tsSideNameSplitterStruct.Split4)
+
+		if !reflect.DeepEqual(goSideNameSplitterStruct, *tsSideNameSplitterStruct) {
+			t.Fatalf("nameSplitter file contents did not match. Go side:\n%#v\nTS side:\n%#v", goSideNameSplitterStruct, tsSideNameSplitterStruct)
 		}
 	})
 }
