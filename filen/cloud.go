@@ -153,9 +153,6 @@ func (api *Filen) ReadDirectory(ctx context.Context, dir types.DirectoryInterfac
 			return nil, nil, fmt.Errorf("ReadDirectory unmarshalling metadata: %v", err)
 		}
 
-		if len(metadata.Key) != 32 {
-
-		}
 		encryptionKey, err := crypto.MakeEncryptionKeyFromUnknownStr(metadata.Key)
 		if err != nil {
 			return nil, nil, fmt.Errorf("ReadDirectory creating encryption key: %v", err)
