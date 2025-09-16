@@ -343,7 +343,7 @@ func (api *Filen) PublicLinkItem(ctx context.Context, item types.NonRootFileSyst
 // shareItemToUserNonRecursive shares a single item with another Filen user.
 // It encrypts the item's metadata with the recipient's public key to maintain end-to-end encryption.
 // This function does not share child items if the item is a directory.
-func (api *Filen) shareItemToUserNonRecursive(ctx context.Context, item types.NonRootFileSystemObject, email string, key *rsa.PublicKey) error {
+func (api *Filen) shareItemToUserNonRecursiveWithParent(ctx context.Context, item types.NonRootFileSystemObject, parentString string, email string, key *rsa.PublicKey) error {
 	metaStr, err := item.GetMeta(api.FileEncryptionVersion)
 	if err != nil {
 		return fmt.Errorf("get meta: %w", err)
@@ -364,7 +364,7 @@ func (api *Filen) shareItemToUserNonRecursive(ctx context.Context, item types.No
 
 	err = api.Client.PostV3ItemShare(ctx, client.V3ItemShareRequest{
 		UUID:       item.GetUUID(),
-		ParentUUID: item.GetParent(),
+		ParentUUID: parentString,
 		Email:      email,
 		Type:       itemType,
 		Metadata:   meta,
@@ -388,17 +388,17 @@ func (api *Filen) shareDirToUser(ctx context.Context, dir *types.Directory, emai
 	g.SetLimit(MaxSmallCallers)
 
 	g.Go(func() error {
-		return api.shareItemToUserNonRecursive(gCtx, dir, email, key)
+		return api.shareItemToUserNonRecursiveWithParent(gCtx, dir, "none", email, key)
 	})
 
 	for _, file := range files {
 		g.Go(func() error {
-			return api.shareItemToUserNonRecursive(gCtx, file, email, key)
+			return api.shareItemToUserNonRecursiveWithParent(gCtx, file, file.GetParent(), email, key)
 		})
 	}
 	for _, dir := range dirs {
 		g.Go(func() error {
-			return api.shareItemToUserNonRecursive(gCtx, dir, email, key)
+			return api.shareItemToUserNonRecursiveWithParent(gCtx, dir, dir.GetParent(), email, key)
 		})
 	}
 
@@ -425,7 +425,7 @@ func (api *Filen) ShareItemToUser(ctx context.Context, item types.NonRootFileSys
 	if dir, ok := item.(*types.Directory); ok {
 		return api.shareDirToUser(ctx, dir, email, publicKey)
 	} else if file, ok := item.(*types.File); ok {
-		return api.shareItemToUserNonRecursive(ctx, file, email, publicKey)
+		return api.shareItemToUserNonRecursiveWithParent(ctx, file, "none", email, publicKey)
 	}
 	return fmt.Errorf("unknown type: %T", item)
 
