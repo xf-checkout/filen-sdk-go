@@ -180,6 +180,19 @@ func TestUploadsToGoDir(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	shareEmail := os.Getenv("TEST_SHARE_EMAIL")
+
+	if shareEmail != "" {
+		if obj, ok := goDir.(types.NonRootFileSystemObject); ok {
+			err = filen.ShareItemToUser(context.Background(), obj, shareEmail)
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			t.Fatal("object is not a NonRootFileSystemObject")
+		}
+	}
+
 	testSmallFile, err := types.NewIncompleteFile(filen.FileEncryptionVersion, "small.txt", "", time.Now(), time.Now(), goDir)
 	if err != nil {
 		t.Fatal(err)
