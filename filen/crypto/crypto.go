@@ -442,6 +442,39 @@ func RSAKeyPairFromStrings(privKey string, pubKey string) (*rsa.PrivateKey, *rsa
 	return privateKey, publicKey, nil
 }
 
+// RSAKeyPairFromTSConfig returns a private and public key pair
+// from base64 encoded strings where the private key is encoded with PKCS1 DER
+func RSAKeyPairFromTSConfig(privKey string, pubKey string) (*rsa.PrivateKey, *rsa.PublicKey, error) {
+	publicKeyDecoded, err := base64.StdEncoding.DecodeString(pubKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding public key: %v", err)
+	}
+	privateKeyDecoded, err := base64.StdEncoding.DecodeString(privKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("decoding private key: %v", err)
+	}
+	publicKey, err := x509.ParsePKCS1PublicKey(publicKeyDecoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing public key: %v", err)
+	}
+
+	privateKeyAny, err := x509.ParsePKCS8PrivateKey(privateKeyDecoded)
+	if err != nil {
+		return nil, nil, fmt.Errorf("parsing private key: %v", err)
+	}
+
+	privateKey, ok := privateKeyAny.(*rsa.PrivateKey)
+	if !ok {
+		return nil, nil, fmt.Errorf("parsing private key, failed to cast: %v", err)
+	}
+
+	if !publicKey.Equal(&privateKey.PublicKey) {
+		return nil, nil, fmt.Errorf("public and private key mismatch")
+	}
+
+	return privateKey, publicKey, nil
+}
+
 // HMACKey is a 256 bit key used as a generic hashing key
 // any time we want a hash of a string
 type HMACKey [32]byte

@@ -149,7 +149,7 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 			}
 			masterKeys[i] = *masterKey
 		}
-		privateKey, publicKey, err := crypto.RSAKeyPairFromStrings(tsconfig.PrivateKey, tsconfig.PublicKey)
+		privateKey, publicKey, err := crypto.RSAKeyPairFromTSConfig(tsconfig.PrivateKey, tsconfig.PublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
 		}
@@ -170,7 +170,7 @@ func NewFromTSConfig(tsconfig TSConfig) (*Filen, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse DEK: %w", err)
 		}
-		private, public, err := crypto.RSAKeyPairFromStrings(tsconfig.PrivateKey, tsconfig.PublicKey)
+		private, public, err := crypto.RSAKeyPairFromTSConfig(tsconfig.PrivateKey, tsconfig.PublicKey)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse rsa keys: %w", err)
 		}

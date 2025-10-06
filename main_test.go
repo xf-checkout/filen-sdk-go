@@ -531,7 +531,7 @@ func TestSerialization(t *testing.T) {
 		}
 		privateKeyEncoded := base64.StdEncoding.EncodeToString(privateKeyRaw)
 
-		publicKeyRaw, err := x509.MarshalPKIXPublicKey(&filen.PublicKey)
+		publicKeyRaw := x509.MarshalPKCS1PublicKey(&filen.PublicKey)
 		if err != nil {
 			t.Fatal(err)
 		}
