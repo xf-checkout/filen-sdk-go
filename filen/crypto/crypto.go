@@ -283,6 +283,10 @@ func (key *EncryptionKey) EncryptMeta(metadata string) EncryptedString {
 	return NewEncryptedStringV3(encrypted, nonce)
 }
 
+func (key *EncryptionKey) ToMasterKey() (*MasterKey, error) {
+	return NewMasterKey(key.Bytes[:])
+}
+
 // DecryptMeta should be avoided, and Filen.DecryptMeta should be used instead
 func (key *EncryptionKey) DecryptMeta(metadata EncryptedString) (string, error) {
 	if metadata[0:3] != "003" {

@@ -51,17 +51,22 @@ func (api *Filen) uploadChunk(ctx context.Context, fu *fileUpload, chunkIndex in
 
 // makeEmptyRequestFromUploaderNoMeta creates a basic upload request without metadata.
 // This is used as a foundation for both regular and empty file uploads.
-func (api *Filen) makeEmptyRequestFromUploaderNoMeta(fu *fileUpload) *client.V3UploadEmptyRequest {
+func (api *Filen) makeEmptyRequestFromUploaderWithMetaAndSize(fu *fileUpload, meta string, size string) (*client.V3UploadEmptyRequest, error) {
+	metaKey, err := fu.EncryptionKey.ToMasterKey()
+	if err != nil {
+		return nil, err
+	}
+
 	return &client.V3UploadEmptyRequest{
 		UUID:       fu.UUID,
-		Name:       api.EncryptMeta(fu.Name),
+		Name:       metaKey.EncryptMeta(fu.Name),
 		NameHashed: api.HashFileName(fu.Name),
-		Size:       api.EncryptMeta("0"),
+		Size:       metaKey.EncryptMeta(size),
 		Parent:     fu.ParentUUID,
-		MimeType:   api.EncryptMeta(fu.MimeType),
-		//Metadata: must be filled by caller
-		Version: api.FileEncryptionVersion,
-	}
+		MimeType:   metaKey.EncryptMeta(fu.MimeType),
+		Metadata:   api.EncryptMeta(meta),
+		Version:    api.FileEncryptionVersion,
+	}, nil
 }
 
 // makeEmptyRequestFromUploader creates a complete upload request for an empty file.
@@ -75,10 +80,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) 
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
-	emptyRequest := api.makeEmptyRequestFromUploaderNoMeta(fu)
-	emptyRequest.Metadata = api.EncryptMeta(string(metadataStr))
-
-	return emptyRequest, nil
+	return api.makeEmptyRequestFromUploaderWithMetaAndSize(fu, string(metadataStr), "0")
 }
 
 // makeRequestFromUploader creates a complete upload request for a non-empty file.
@@ -92,9 +94,11 @@ func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash str
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
-	emptyRequest := api.makeEmptyRequestFromUploaderNoMeta(fu)
-	emptyRequest.Metadata = api.EncryptMeta(string(metadataStr))
-	emptyRequest.Size = api.EncryptMeta(strconv.Itoa(size))
+	emptyRequest, err := api.makeEmptyRequestFromUploaderWithMetaAndSize(fu, string(metadataStr), strconv.Itoa(size))
+
+	if err != nil {
+		return nil, fmt.Errorf("make empty request from uploader: %w", err)
+	}
 
 	return &client.V3UploadDoneRequest{
 		V3UploadEmptyRequest: *emptyRequest,

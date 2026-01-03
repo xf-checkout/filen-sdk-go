@@ -535,7 +535,11 @@ func (api *Filen) UploadFromReader(ctx context.Context, file *types.IncompleteFi
 // updateFileMeta updates the metadata of a file on the server.
 // This is an internal helper used by UpdateMeta.
 func (api *Filen) updateFileMeta(ctx context.Context, file *types.File, metaEncrypted crypto.EncryptedString, nameHashed string) error {
-	nameEncrypted := file.EncryptionKey.EncryptMeta(file.Name)
+	metaKey, err := file.EncryptionKey.ToMasterKey()
+	if err != nil {
+		return fmt.Errorf("encrypt name: %w", err)
+	}
+	nameEncrypted := metaKey.EncryptMeta(file.Name)
 	return api.Client.PostV3FileMetadata(ctx, file.UUID, nameEncrypted, nameHashed, metaEncrypted)
 }
 
