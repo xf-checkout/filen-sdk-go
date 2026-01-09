@@ -302,7 +302,7 @@ func (res *aPIResponse) IntoData(data any) error {
 // DownloadFileChunk downloads a file chunk from the Filen storage backend.
 // It takes the context, file UUID, region, bucket, and chunk index as parameters.
 // It returns the chunk data or an error if the download fails.
-func (c *Client) DownloadFileChunk(ctx context.Context, uuid string, region string, bucket string, chunkIdx int) ([]byte, error) {
+func (c *Client) DownloadFileChunk(ctx context.Context, uuid string, region string, bucket string, chunkIdx int64) ([]byte, error) {
 	url := &FilenURL{
 		Type: URLTypeEgest,
 		Path: fmt.Sprintf("/%s/%s/%s/%v", region, bucket, uuid, chunkIdx),

@@ -147,7 +147,7 @@ func (i *IntFromMaybeString) UnmarshalJSON(data []byte) error {
 // to ensure end-to-end encryption of file details.
 type FileMetadata struct {
 	Name         string             `json:"name"`         // The file name
-	Size         int                `json:"size"`         // The file size in bytes
+	Size         int64              `json:"size"`         // The file size in bytes
 	MimeType     string             `json:"mime"`         // The MIME type
 	Key          string             `json:"key"`          // The encryption key as a string
 	LastModified IntFromMaybeString `json:"lastModified"` // Last modification timestamp in milliseconds
@@ -160,11 +160,11 @@ type FileMetadata struct {
 // only available once a file is fully uploaded.
 type File struct {
 	IncompleteFile                              // Embedded IncompleteFile with base properties
-	Size           int                          // The file size in bytes
+	Size           int64                        // The file size in bytes
 	Favorited      bool                         // Whether the file is marked as a favorite
 	Region         string                       // The file's storage region
 	Bucket         string                       // The file's storage bucket
-	Chunks         int                          // How many 1 MiB chunks the file is partitioned into
+	Chunks         int64                        // How many 1 MiB chunks the file is partitioned into
 	Hash           string                       // The file's SHA512 hash
 	Version        crypto.FileEncryptionVersion // The crypto.FileEncryptionVersion version used to encrypt the file
 }

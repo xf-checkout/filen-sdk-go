@@ -26,7 +26,7 @@ type V3DirDownloadResponse struct {
 		UUID     string                       `json:"uuid"`
 		Bucket   string                       `json:"bucket"`
 		Region   string                       `json:"region"`
-		Chunks   int                          `json:"chunks"`
+		Chunks   int64                        `json:"chunks"`
 		Parent   string                       `json:"parent"`
 		Metadata crypto.EncryptedString       `json:"metadata"`
 		Version  crypto.FileEncryptionVersion `json:"version"`

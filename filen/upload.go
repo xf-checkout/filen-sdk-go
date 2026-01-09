@@ -16,33 +16,31 @@ import (
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
 )
 
-// fileUpload encapsulates the state of an ongoing file upload.
+// FileUpload encapsulates the state of an ongoing file upload.
 // It tracks the file being uploaded and maintains the upload context,
 // encryption key, and hash calculation.
-type fileUpload struct {
-	types.IncompleteFile        // The file being uploaded
-	uploadKey            string // Random key for this upload session
-	cancel               context.CancelCauseFunc
-	hasher               hash.Hash // For calculating file hash during upload
+type FileUpload struct {
+	types.IncompleteFile           // The file being uploaded
+	UploadKey            string    // Random key for this upload session
+	Hasher               hash.Hash // For calculating file hash during upload
 }
 
-// newFileUpload creates a new fileUpload structure from an IncompleteFile.
+// NewFileUpload creates a new FileUpload structure from an IncompleteFile.
 // It initializes a new random upload key and hash calculator for the upload process.
-func (api *Filen) newFileUpload(cancel context.CancelCauseFunc, file *types.IncompleteFile) *fileUpload {
-	return &fileUpload{
+func (api *Filen) NewFileUpload(file *types.IncompleteFile) *FileUpload {
+	return &FileUpload{
 		IncompleteFile: *file,
-		uploadKey:      crypto.GenerateRandomString(32),
-		cancel:         cancel,
-		hasher:         sha512.New(),
+		UploadKey:      crypto.GenerateRandomString(32),
+		Hasher:         sha512.New(),
 	}
 }
 
-// uploadChunk encrypts and uploads a single chunk of a file.
+// UploadChunk encrypts and uploads a single chunk of a file.
 // This function handles the encryption of the chunk before sending it to the server.
 // It returns storage details (bucket and region) for the uploaded chunk.
-func (api *Filen) uploadChunk(ctx context.Context, fu *fileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
+func (api *Filen) UploadChunk(ctx context.Context, fu *FileUpload, chunkIndex int, data []byte) (*client.V3UploadResponse, error) {
 	data = fu.EncryptionKey.EncryptData(data)
-	response, err := api.Client.PostV3Upload(ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.uploadKey, data)
+	response, err := api.Client.PostV3Upload(ctx, fu.UUID, chunkIndex, fu.ParentUUID, fu.UploadKey, data)
 	if err != nil {
 		return nil, fmt.Errorf("upload chunk %d: %w", chunkIndex, err)
 	}
@@ -51,7 +49,7 @@ func (api *Filen) uploadChunk(ctx context.Context, fu *fileUpload, chunkIndex in
 
 // makeEmptyRequestFromUploaderNoMeta creates a basic upload request without metadata.
 // This is used as a foundation for both regular and empty file uploads.
-func (api *Filen) makeEmptyRequestFromUploaderWithMetaAndSize(fu *fileUpload, meta string, size string) (*client.V3UploadEmptyRequest, error) {
+func (api *Filen) makeEmptyRequestFromUploaderWithMetaAndSize(fu *FileUpload, meta string, size string) (*client.V3UploadEmptyRequest, error) {
 	metaKey, err := fu.EncryptionKey.ToMasterKey()
 	if err != nil {
 		return nil, err
@@ -71,7 +69,7 @@ func (api *Filen) makeEmptyRequestFromUploaderWithMetaAndSize(fu *fileUpload, me
 
 // makeEmptyRequestFromUploader creates a complete upload request for an empty file.
 // It includes encrypted metadata and file hash information.
-func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
+func (api *Filen) makeEmptyRequestFromUploader(fu *FileUpload, fileHash string) (*client.V3UploadEmptyRequest, error) {
 	metadata := fu.GetRawMeta(api.FileEncryptionVersion)
 	metadata.Size = 0
 	metadata.Hash = fileHash
@@ -85,7 +83,7 @@ func (api *Filen) makeEmptyRequestFromUploader(fu *fileUpload, fileHash string) 
 
 // makeRequestFromUploader creates a complete upload request for a non-empty file.
 // It includes encrypted metadata, file size, chunk count, and hash information.
-func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash string) (*client.V3UploadDoneRequest, error) {
+func (api *Filen) makeRequestFromUploader(fu *FileUpload, size int64, fileHash string) (*client.V3UploadDoneRequest, error) {
 	metadata := fu.GetRawMeta(api.FileEncryptionVersion)
 	metadata.Size = size
 	metadata.Hash = fileHash
@@ -94,7 +92,7 @@ func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash str
 	if err != nil {
 		return nil, fmt.Errorf("marshal file metadata: %w", err)
 	}
-	emptyRequest, err := api.makeEmptyRequestFromUploaderWithMetaAndSize(fu, string(metadataStr), strconv.Itoa(size))
+	emptyRequest, err := api.makeEmptyRequestFromUploaderWithMetaAndSize(fu, string(metadataStr), strconv.FormatInt(size, 10))
 
 	if err != nil {
 		return nil, fmt.Errorf("make empty request from uploader: %w", err)
@@ -103,15 +101,15 @@ func (api *Filen) makeRequestFromUploader(fu *fileUpload, size int, fileHash str
 	return &client.V3UploadDoneRequest{
 		V3UploadEmptyRequest: *emptyRequest,
 		Chunks:               (size + ChunkSize - 1) / ChunkSize,
-		UploadKey:            fu.uploadKey,
+		UploadKey:            fu.UploadKey,
 		Rm:                   crypto.GenerateRandomString(32),
 	}, nil
 }
 
 // completeUpload finalizes the upload of a non-empty file.
 // It sends the final metadata to the server and constructs the completed File object.
-func (api *Filen) completeUpload(ctx context.Context, fu *fileUpload, bucket string, region string, size int) (*types.File, error) {
-	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
+func (api *Filen) completeUpload(ctx context.Context, fu *FileUpload, bucket string, region string, size int64) (*types.File, error) {
+	fileHash := hex.EncodeToString(fu.Hasher.Sum(nil))
 	uploadRequest, err := api.makeRequestFromUploader(fu, size, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
@@ -134,8 +132,8 @@ func (api *Filen) completeUpload(ctx context.Context, fu *fileUpload, bucket str
 
 // completeUploadEmpty finalizes the upload of an empty (zero-byte) file.
 // It sends the appropriate metadata to the server and constructs the completed File object.
-func (api *Filen) completeUploadEmpty(ctx context.Context, fu *fileUpload) (*types.File, error) {
-	fileHash := hex.EncodeToString(fu.hasher.Sum(nil))
+func (api *Filen) completeUploadEmpty(ctx context.Context, fu *FileUpload) (*types.File, error) {
+	fileHash := hex.EncodeToString(fu.Hasher.Sum(nil))
 	uploadRequest, err := api.makeEmptyRequestFromUploader(fu, fileHash)
 	if err != nil {
 		return nil, fmt.Errorf("make request from uploader: %w", err)
@@ -167,8 +165,7 @@ func (api *Filen) completeUploadEmpty(ctx context.Context, fu *fileUpload) (*typ
 // - Finalizing the upload with appropriate metadata
 // - Updating search indexes and shared parent metadata
 func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r io.Reader) (*types.File, error) {
-	ctx, cancel := context.WithCancelCause(ctx)
-	fu := api.newFileUpload(cancel, file)
+	fu := api.NewFileUpload(file)
 	bucketAndRegion := make(chan client.V3UploadResponse, 1)
 
 	size, err := api.uploadFileChunks(ctx, fu, bucketAndRegion, file, r)
@@ -176,7 +173,7 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 		return nil, err
 	}
 
-	completeFile, err := api.completeFileUpload(ctx, fu, bucketAndRegion, size)
+	completeFile, err := api.CompleteFileUpload(ctx, fu, bucketAndRegion, size)
 	if err != nil {
 		return nil, err
 	}
@@ -190,37 +187,18 @@ func (api *Filen) UploadFile(ctx context.Context, file *types.IncompleteFile, r 
 	return completeFile, nil
 }
 
-func (api *Filen) makeChunkUploadFunc(gCtx context.Context, bucketAndRegion chan client.V3UploadResponse, fu *fileUpload, chunkIndex int, data []byte) func() error {
-	return func() error {
-		defer func() {
-			<-api.UploadThreadSem
-		}()
-		resp, err := api.uploadChunk(gCtx, fu, chunkIndex, data)
-		if err != nil {
-			return err
-		}
-		select { // only care about getting this once
-		case bucketAndRegion <- *resp:
-		default:
-		}
-		return nil
-	}
-}
-
-func (api *Filen) uploadFileChunks(ctx context.Context, fu *fileUpload, bucketAndRegion chan client.V3UploadResponse, file *types.IncompleteFile, r io.Reader) (int, error) {
-	g, gCtx := errgroup.WithContext(ctx)
-	size := 0
+func (api *Filen) uploadFileChunks(ctx context.Context, fu *FileUpload, bucketAndRegion chan client.V3UploadResponse, file *types.IncompleteFile, r io.Reader) (int64, error) {
+	size := int64(0)
 	for i := 0; ; i++ {
 		data := make([]byte, ChunkSize, ChunkSize+file.EncryptionKey.Cipher.Overhead())
 		lastChunk := false
 		for j := 0; j < ChunkSize; {
 			read, err := r.Read(data[j:])
 			if err != nil && err != io.EOF {
-				fu.cancel(fmt.Errorf("read chunk %d: %w", i, err))
 				return 0, err
 			}
 			j += read
-			size += read
+			size += int64(read)
 			if err == io.EOF {
 				data = data[:j]
 				lastChunk = true
@@ -229,27 +207,25 @@ func (api *Filen) uploadFileChunks(ctx context.Context, fu *fileUpload, bucketAn
 		}
 
 		if len(data) > 0 {
-			fu.hasher.Write(data)
-			select {
-			case <-ctx.Done():
-				return 0, fmt.Errorf("context done %w", context.Cause(ctx))
-			case api.UploadThreadSem <- struct{}{}:
-				g.Go(api.makeChunkUploadFunc(gCtx, bucketAndRegion, fu, i, data))
+			fu.Hasher.Write(data)
+			resp, err := api.UploadChunk(ctx, fu, i, data)
+			if err != nil {
+				return 0, err
+			}
+			select { // only care about getting this once
+			case bucketAndRegion <- *resp:
+			default:
 			}
 		}
-
 		if lastChunk {
 			break
 		}
 	}
 
-	if err := g.Wait(); err != nil {
-		return 0, err
-	}
 	return size, nil
 }
 
-func (api *Filen) completeFileUpload(ctx context.Context, fu *fileUpload, bucketAndRegion chan client.V3UploadResponse, size int) (*types.File, error) {
+func (api *Filen) CompleteFileUpload(ctx context.Context, fu *FileUpload, bucketAndRegion chan client.V3UploadResponse, size int64) (*types.File, error) {
 	var (
 		completeFile *types.File
 		err          error

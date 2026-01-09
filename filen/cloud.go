@@ -521,7 +521,7 @@ func (api *Filen) GetDownloadReader(ctx context.Context, file *types.File) io.Re
 // starting at the given offset, reading up to the specified limit.
 // This is useful for range requests or partial downloads.
 // The returned io.ReadCloser should be closed after use to release resources.
-func (api *Filen) GetDownloadReaderWithOffset(ctx context.Context, file *types.File, offset int, limit int) io.ReadCloser {
+func (api *Filen) GetDownloadReaderWithOffset(ctx context.Context, file *types.File, offset int64, limit int64) io.ReadCloser {
 	return newChunkedReaderWithOffset(ctx, api, file, offset, limit)
 }
 

@@ -19,8 +19,8 @@ type V3DirContentResponse struct {
 		Metadata  crypto.EncryptedString       `json:"metadata"`
 		Rm        string                       `json:"rm"`
 		Timestamp int                          `json:"timestamp"`
-		Chunks    int                          `json:"chunks"`
-		Size      int                          `json:"size"`
+		Chunks    int64                        `json:"chunks"`
+		Size      int64                        `json:"size"`
 		Bucket    string                       `json:"bucket"`
 		Region    string                       `json:"region"`
 		Parent    string                       `json:"parent"`

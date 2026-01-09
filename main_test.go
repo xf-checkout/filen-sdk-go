@@ -807,7 +807,7 @@ func TestPartialRead(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	reader := filen.GetDownloadReaderWithOffset(context.Background(), file, 0, len(myString))
+	reader := filen.GetDownloadReaderWithOffset(context.Background(), file, 0, int64(len(myString)))
 
 	readBytes := make([]byte, sdk.ChunkSize*2)
 	n, err := reader.Read(readBytes)
