@@ -152,7 +152,7 @@ type FileMetadata struct {
 	Key          string             `json:"key"`          // The encryption key as a string
 	LastModified IntFromMaybeString `json:"lastModified"` // Last modification timestamp in milliseconds
 	Created      int                `json:"creation"`     // Creation timestamp in milliseconds
-	Hash         string             `json:"hash"`         // The file's SHA512 hash
+	Hash         string             `json:"blake3"`       // The file's Blake3 hash
 }
 
 // File represents a complete file in the Filen cloud storage.
@@ -165,7 +165,7 @@ type File struct {
 	Region         string                       // The file's storage region
 	Bucket         string                       // The file's storage bucket
 	Chunks         int64                        // How many 1 MiB chunks the file is partitioned into
-	Hash           string                       // The file's SHA512 hash
+	Hash           string                       // The file's Blake3 hash
 	Version        crypto.FileEncryptionVersion // The crypto.FileEncryptionVersion version used to encrypt the file
 }
 

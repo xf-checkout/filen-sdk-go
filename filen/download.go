@@ -2,11 +2,11 @@ package filen
 
 import (
 	"context"
-	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
+	"github.com/zeebo/blake3"
 	"hash"
 	"io"
 )
@@ -60,7 +60,7 @@ func newChunkedReaderWithOffset(ctx context.Context, api *Filen, file *types.Fil
 		ctx:          ctx,
 		file:         file,
 		api:          api,
-		hasher:       sha512.New(),
+		hasher:       blake3.New(),
 		currentChunk: nil,
 		firstIndex:   offset,
 		totalRead:    0,

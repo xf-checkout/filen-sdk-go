@@ -2,10 +2,10 @@ package filen
 
 import (
 	"context"
-	"crypto/sha512"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/zeebo/blake3"
 	"golang.org/x/sync/errgroup"
 	"hash"
 	"io"
@@ -31,7 +31,7 @@ func (api *Filen) NewFileUpload(file *types.IncompleteFile) *FileUpload {
 	return &FileUpload{
 		IncompleteFile: *file,
 		UploadKey:      crypto.GenerateRandomString(32),
-		Hasher:         sha512.New(),
+		Hasher:         blake3.New(),
 	}
 }
 
