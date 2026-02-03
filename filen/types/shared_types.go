@@ -379,10 +379,7 @@ func (m *CtxMutex) Lock(ctx context.Context) error {
 // This method will wait indefinitely until the mutex becomes available,
 // with no option for cancellation.
 func (m *CtxMutex) BlockUntilLock() {
-	select {
-	case m.channel <- struct{}{}:
-		return
-	}
+	m.channel <- struct{}{}
 }
 
 // MustLock attempts to lock the mutex without blocking.

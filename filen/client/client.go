@@ -7,12 +7,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"github.com/rclone/rclone/fs/fshttp"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/rclone/rclone/fs/fshttp"
 )
 
 // UnauthorizedClient represents a client without authorization
@@ -288,7 +288,7 @@ func (res *aPIResponse) String() string {
 // If the unmarshalling process fails, the error is returned.
 func (res *aPIResponse) IntoData(data any) error {
 	if res.Data == nil {
-		return errors.New(fmt.Sprintf("No data in response %s", res))
+		return fmt.Errorf("No data in response %s", res)
 	}
 	err := json.Unmarshal(res.Data, data)
 	if err != nil {

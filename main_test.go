@@ -9,12 +9,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/search"
-	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
-	"github.com/joho/godotenv"
-	"golang.org/x/sync/errgroup"
 	"io"
 	"os"
 	"path"
@@ -22,6 +16,13 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	sdk "github.com/FilenCloudDienste/filen-sdk-go/filen"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/search"
+	"github.com/FilenCloudDienste/filen-sdk-go/filen/types"
+	"github.com/joho/godotenv"
+	"golang.org/x/sync/errgroup"
 )
 
 var filen *sdk.Filen
@@ -532,9 +533,6 @@ func TestSerialization(t *testing.T) {
 		privateKeyEncoded := base64.StdEncoding.EncodeToString(privateKeyRaw)
 
 		publicKeyRaw := x509.MarshalPKCS1PublicKey(&filen.PublicKey)
-		if err != nil {
-			t.Fatal(err)
-		}
 		publicKeyEncoded := base64.StdEncoding.EncodeToString(publicKeyRaw)
 
 		tsConfig := &sdk.TSConfig{
