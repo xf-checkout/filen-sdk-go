@@ -13,8 +13,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 	"size": 100,
 	"mime": "text/plain",
 	"key": "1234567890123456789012345678901234567890123456789012345678901234",
-	"lastModified": "1234567890",
-	"creation": 1234567890,
+	"lastModified": "8589934592",
+	"creation": 8589934592,
 	"hash": ""
 }
 `
@@ -30,8 +30,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 		Size:         100,
 		MimeType:     "text/plain",
 		Key:          "1234567890123456789012345678901234567890123456789012345678901234",
-		LastModified: 1234567890,
-		Created:      1234567890,
+		LastModified: 8589934592,
+		Created:      8589934592,
 		Hash:         "",
 	}
 
@@ -45,8 +45,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 	"size": 100,
 	"mime": "text/plain",
 	"key": "1234567890123456789012345678901234567890123456789012345678901234",
-	"lastModified": 1234567890,
-	"creation": 1234567890,
+	"lastModified": 8589934592,
+	"creation": 8589934592,
 	"hash": ""
 }
 `
@@ -66,8 +66,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 	"size": 100,
 	"mime": "text/plain",
 	"key": "1234567890123456789012345678901234567890123456789012345678901234",
-	"lastModified": 1234567890.0,
-	"creation": 1234567890,
+	"lastModified": 8589934592.0,
+	"creation": 8589934592,
 	"hash": ""
 }
 `
@@ -87,8 +87,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 	"size": 100,
 	"mime": "text/plain",
 	"key": "1234567890123456789012345678901234567890123456789012345678901234",
-	"lastModified": "1234567890.0",
-	"creation": 1234567890,
+	"lastModified": "8589934592.0",
+	"creation": 8589934592,
 	"hash": ""
 }
 `
@@ -108,8 +108,8 @@ func TestFileMetaMarshalling(t *testing.T) {
 	"size": 100,
 	"mime": "text/plain",
 	"key": "1234567890123456789012345678901234567890123456789012345678901234",
-	"lastModified": "1234567890a",
-	"creation": 1234567890,
+	"lastModified": "8589934592a",
+	"creation": 8589934592,
 	"hash": ""
 }
 `

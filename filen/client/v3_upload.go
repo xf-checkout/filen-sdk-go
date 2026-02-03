@@ -18,7 +18,7 @@ type V3UploadResponse struct {
 
 // PostV3Upload uploads a file chunk to the Filen storage backend.
 // It handles the direct binary upload to the ingest servers and returns storage metadata.
-func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int, parentUUID string, uploadKey string, data []byte) (*V3UploadResponse, error) {
+func (c *Client) PostV3Upload(ctx context.Context, uuid string, chunkIdx int64, parentUUID string, uploadKey string, data []byte) (*V3UploadResponse, error) {
 	// build request
 	dataHash := hex.EncodeToString(crypto.RunSHA512(data))
 	url := &FilenURL{

@@ -127,8 +127,8 @@ func (i *IntFromMaybeString) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	// Try int first
-	var intValue int
+	// Try int64 first
+	var intValue int64
 	if err := json.Unmarshal(data, &intValue); err == nil {
 		*i = IntFromMaybeString(intValue)
 		return nil
@@ -145,7 +145,8 @@ func (i *IntFromMaybeString) UnmarshalJSON(data []byte) error {
 	var stringValue string
 	if err := json.Unmarshal(data, &stringValue); err == nil {
 		// string to int
-		if value, err := strconv.Atoi(stringValue); err == nil {
+
+		if value, err := strconv.ParseInt(stringValue, 10, 64); err == nil {
 			*i = IntFromMaybeString(value)
 			return nil
 		}
@@ -205,7 +206,7 @@ const (
 // to ensure end-to-end encryption of directory details.
 type DirectoryMetaData struct {
 	Name     string `json:"name"`     // The directory name
-	Creation int    `json:"creation"` // Creation timestamp in seconds
+	Creation int64  `json:"creation"` // Creation timestamp in seconds
 }
 
 // Directory represents a directory in the Filen cloud storage.
@@ -315,7 +316,7 @@ func (dir Directory) IsRoot() bool {
 func (dir Directory) GetMeta(v crypto.FileEncryptionVersion) (string, error) {
 	meta := DirectoryMetaData{
 		Name:     dir.Name,
-		Creation: int(dir.Created.Unix()),
+		Creation: dir.Created.Unix(),
 	}
 	metaStr, err := json.Marshal(meta)
 	if err != nil {
