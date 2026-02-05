@@ -1,12 +1,13 @@
 package search
 
 import (
+	"sort"
+	"strings"
+
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/client"
 	"github.com/FilenCloudDienste/filen-sdk-go/filen/crypto"
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
-	"sort"
-	"strings"
 )
 
 func nameSplitter(input string, minLength int, maxLength int) []string {
