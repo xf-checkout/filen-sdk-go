@@ -127,13 +127,13 @@ type nameSplitterTestFile struct {
 func makeNameSplitterTestFile() nameSplitterTestFile {
 	return nameSplitterTestFile{
 		Name1:  "General_Invitation_-_the_ECSO_Award_Finals_2024.docx",
-		Split1: search.NameSplitter("General_Invitation_-_the_ECSO_Award_Finals_2024.docx"),
+		Split1: search.NameSplitter("General_Invitation_-_the_ECSO_Award_Finals_2024.docx", 2, 16),
 		Name2:  "Screenshot 2023-05-16 201840.png",
-		Split2: search.NameSplitter("Screenshot 2023-05-16 201840.png"),
+		Split2: search.NameSplitter("Screenshot 2023-05-16 201840.png", 2, 16),
 		Name3:  "!service-invoice-657c56116e4f6947a80001cc.pdf",
-		Split3: search.NameSplitter("!service-invoice-657c56116e4f6947a80001cc.pdf"),
+		Split3: search.NameSplitter("!service-invoice-657c56116e4f6947a80001cc.pdf", 2, 16),
 		Name4:  "файл.txt",
-		Split4: search.NameSplitter("файл.txt"),
+		Split4: search.NameSplitter("файл.txt", 2, 16),
 	}
 }
 
