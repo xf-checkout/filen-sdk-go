@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/rclone/rclone/fs/fshttp"
 )
@@ -32,8 +33,15 @@ type Client struct {
 // The context is used to create the underlying HTTP client.
 func New(ctx context.Context) *UnauthorizedClient {
 	return &UnauthorizedClient{
-		httpClient: *fshttp.NewClient(ctx),
+		httpClient: *fshttp.NewClientCustom(ctx, customizeHTTPClient),
 	}
+}
+
+func customizeHTTPClient(transport *http.Transport) {
+	// 60 minutes is aggressive but sometimes the server can genuinely take a few minutes to do all the work it needs to
+	// for example, when uploading a large file, the server goes to check potentially milions of chunks,
+	// which can take a while, and we don't want the client to timeout in the middle of that. The client should be able to wait as long as it needs to.
+	transport.ResponseHeaderTimeout = 60 * time.Minute
 }
 
 // Authorize creates an authorized Client from an UnauthorizedClient
